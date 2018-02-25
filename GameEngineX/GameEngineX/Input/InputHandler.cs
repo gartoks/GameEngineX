@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Windows.Input;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
@@ -10,9 +11,9 @@ namespace GameEngineX.Input {
             InputHandler.downKeys = new HashSet<Key>();
             InputHandler.releasedKeys = new HashSet<Key>();
 
-            InputHandler.pressedButtons = new HashSet<MouseButton>();
-            InputHandler.downButtons = new HashSet<MouseButton>();
-            InputHandler.releasedButtons = new HashSet<MouseButton>();
+            InputHandler.pressedButtons = 0;//new HashSet<MouseButton>();
+            InputHandler.downButtons = 0;//new HashSet<MouseButton>();
+            InputHandler.releasedButtons = 0;//new HashSet<MouseButton>();
 
             //InputHandler.distinctVirtualKeys =
             //    Enumerable.Range(0, 256).Select(KeyInterop.KeyFromVirtualKey).Where(item => item != Key.None).Distinct().Select(item => (byte)KeyInterop.VirtualKeyFromKey(item)).ToArray();
@@ -24,9 +25,12 @@ namespace GameEngineX.Input {
         private static HashSet<Key> downKeys;
         private static HashSet<Key> releasedKeys;
 
-        private static HashSet<MouseButton> pressedButtons;
-        private static HashSet<MouseButton> downButtons;
-        private static HashSet<MouseButton> releasedButtons;
+        private static int pressedButtons;
+        private static int downButtons;
+        private static int releasedButtons;
+        //private static HashSet<MouseButton> pressedButtons;
+        //private static HashSet<MouseButton> downButtons;
+        //private static HashSet<MouseButton> releasedButtons;
 
         private static (int x, int y) mousePos;
         private static (int x, int y) prevMousePos;
@@ -64,19 +68,29 @@ namespace GameEngineX.Input {
             InputHandler.internal_downKeys.Clear();
             InputHandler.internal_upKeys.Clear();
 
-            InputHandler.pressedButtons.Clear();
-            InputHandler.releasedButtons.Clear();
+            InputHandler.pressedButtons = 0;
+            InputHandler.releasedButtons = 0;
+            //InputHandler.pressedButtons.Clear();
+            //InputHandler.releasedButtons.Clear();
 
             foreach (MouseButton mb in InputHandler.internal_downButtons) {
-                if (!InputHandler.downButtons.Contains(mb))
-                    InputHandler.pressedButtons.Add(mb);
+                //if (!InputHandler.downButtons.Contains(mb))
+                //    InputHandler.pressedButtons.Add(mb);
 
-                InputHandler.downButtons.Add(mb);
+                //InputHandler.downButtons.Add(mb);
+
+                if ((InputHandler.downButtons & (int)mb) == 0)
+                    InputHandler.pressedButtons |= (int)mb;
+
+                InputHandler.downButtons |= (int)mb;
             }
 
             foreach (MouseButton mb in InputHandler.internal_upButtons) {
-                downButtons.Remove(mb);
-                releasedButtons.Add(mb);
+                //downButtons.Remove(mb);
+                //releasedButtons.Add(mb);
+
+                InputHandler.downButtons &= ~(int)mb;
+                InputHandler.releasedButtons |= (int)mb;
             }
 
             InputHandler.internal_downButtons.Clear();
@@ -99,16 +113,51 @@ namespace GameEngineX.Input {
             return InputHandler.releasedKeys.Contains(key);
         }
 
+        public static IEnumerable<Key> DownKeys => InputHandler.downKeys;
+
         public static bool IsMouseButtonPressed(MouseButton button) {
-            return InputHandler.pressedButtons.Contains(button);
+            //return InputHandler.pressedButtons.Contains(button);
+            return (InputHandler.pressedButtons & (int)button) > 0;
         }
 
         public static bool IsMouseButtonDown(MouseButton button) {
-            return InputHandler.downButtons.Contains(button);
+            //return InputHandler.downButtons.Contains(button);
+            return (InputHandler.downButtons & (int)button) > 0;
         }
 
         public static bool IsMouseButtonReleased(MouseButton button) {
-            return InputHandler.releasedButtons.Contains(button);
+            //return InputHandler.releasedButtons.Contains(button);
+            return (InputHandler.releasedButtons & (int)button) > 0;
+        }
+
+        public static IEnumerable<MouseButton> PressedMouseButtons {
+            get {
+                foreach (object mouseButton in Enum.GetValues(typeof(MouseButton))) {
+                    MouseButton mB = (MouseButton)mouseButton;
+                    if (IsMouseButtonPressed(mB))
+                        yield return mB;
+                }
+            }
+        }
+
+        public static IEnumerable<MouseButton> DownMouseButtons {
+            get {
+                foreach (object mouseButton in Enum.GetValues(typeof(MouseButton))) {
+                    MouseButton mB = (MouseButton)mouseButton;
+                    if (IsMouseButtonDown(mB))
+                        yield return mB;
+                }
+            }
+        }
+
+        public static IEnumerable<MouseButton> ReleasedMouseButtons {
+            get {
+                foreach (object mouseButton in Enum.GetValues(typeof(MouseButton))) {
+                    MouseButton mB = (MouseButton)mouseButton;
+                    if (IsMouseButtonReleased(mB))
+                        yield return mB;
+                }
+            }
         }
 
         public static (int x, int y) MousePosition => (InputHandler.mousePos.x, InputHandler.mousePos.y);

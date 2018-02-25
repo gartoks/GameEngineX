@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
 
-namespace GameEngineX.Graphics.Textures {
+namespace GameEngineX.Graphics.Renderables.Textures {
     public class TextureAtlas : Texture2D {
         private readonly Dictionary<string, SubTexture> subTextures;
 

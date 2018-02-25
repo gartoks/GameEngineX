@@ -38,15 +38,18 @@ namespace GameEngineX.Game {
             this.scenes[sceneName] = scene;
         }
 
-        public void LoadScene(string filePath) {
-            XMLElement sceneElement = XMLReader.Read(filePath);
+        //public void LoadScene(string filePath) {
+        //    XMLElement sceneElement = XMLReader.Read(filePath);
 
-            Scene.Deserialize(sceneElement);
-        }
+        //    Scene.Deserialize(sceneElement);
+        //} TODO
 
         public void ActivateScene(string sceneName) {
             if (this.activeScene == null && sceneName == null || this.activeScene != null && this.activeScene.Name.Equals(sceneName))
                 return;
+
+            if (this.activeScene != null)
+                OnSceneDeactivated(this.activeScene);
 
             if (sceneName == null)
                 this.activeScene = null;
@@ -58,18 +61,18 @@ namespace GameEngineX.Game {
             OnSceneActivated(this.activeScene);
         }
 
-        public void SaveScene(string filePath, string sceneName = null) {
-            if (sceneName == null)
-                sceneName = ActiveScene;
+        //public void SaveScene(string filePath, string sceneName = null) {
+        //    if (sceneName == null)
+        //        sceneName = ActiveScene;
 
-            if (!this.scenes.ContainsKey(sceneName))
-                return;
+        //    if (!this.scenes.ContainsKey(sceneName))
+        //        return;
 
-            Scene scene = this.scenes[sceneName];
-            XMLElement sceneElement = scene.Serialize();
+        //    Scene scene = this.scenes[sceneName];
+        //    XMLElement sceneElement = scene.Serialize();
 
-            XMLWriter.Write(sceneElement, filePath);
-        }
+        //    XMLWriter.Write(sceneElement, filePath);
+        //}     TODO
 
         internal Scene GetScene(string sceneName) {
             return this.scenes[sceneName];
@@ -77,9 +80,9 @@ namespace GameEngineX.Game {
 
         protected abstract void OnSceneActivated(Scene scene);
 
-        public string ActiveScene => activeScene?.Name;
+        protected abstract void OnSceneDeactivated(Scene scene);
 
-        internal Scene ActiveSceneObj => activeScene;
+        internal Scene ActiveScene => activeScene;
 
         //public bool IsOnScreen(GameObject gameObject) {
         //    IEnumerable<Collider> colliders = gameObject.GetComponents<Collider>();

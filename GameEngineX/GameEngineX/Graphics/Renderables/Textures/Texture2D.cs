@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
+using System.Runtime.Serialization;
 
-namespace GameEngineX.Graphics.Textures {
+namespace GameEngineX.Graphics.Renderables.Textures {
     public class Texture2D : Texture, IRenderTarget {
 
         protected readonly Image image;
@@ -15,7 +16,7 @@ namespace GameEngineX.Graphics.Textures {
         }
 
         internal override void Render(int renderLayer, Renderer renderer) {
-            renderer.DrawTexture(renderLayer, Image, 0, 0, Width, Height);
+            renderer.DrawCenteredTexture(renderLayer, Image, 0, 0, Width, Height);
         }
 
         public override int Width => Image.Width;
@@ -27,5 +28,10 @@ namespace GameEngineX.Graphics.Textures {
         public System.Drawing.Graphics Graphics => System.Drawing.Graphics.FromImage(Image);
 
         public Rectangle TargetRectangle => this.bounds;
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context) {
+            // TODO
+        }
+
     }
 }

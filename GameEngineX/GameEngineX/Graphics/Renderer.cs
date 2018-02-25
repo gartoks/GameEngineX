@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.Linq;
 using GameEngineX.Game.GameObjects;
 using GameEngineX.Game.GameObjects.GameObjectComponents;
@@ -16,6 +17,8 @@ namespace GameEngineX.Graphics {
 
         private static readonly Matrix IDENTITY = new Matrix();
 
+        private readonly IRenderTarget renderTarget;
+
         public readonly Color ClearColor;
 
         private BufferedGraphics bufferedGraphics;
@@ -27,11 +30,15 @@ namespace GameEngineX.Graphics {
 
         private System.Drawing.Graphics graphics;
         private readonly List<(Matrix transformationMatrix, int renderLayer, Action renderAction)> renderQueue;
+        private int renderQueueSize;
 
         private readonly List<RectangleF> rectangleCache;
         private int rectangleCasheNextAvailableIndex;
 
         internal Renderer(Color clearColor, IRenderTarget renderTarget) {
+            //IsScreenRenderer = renderTarget is ScreenRenderTarget;
+            this.renderTarget = renderTarget;
+
             ClearColor = clearColor;
 
             this.bufferedGraphicsContext = new BufferedGraphicsContext();
@@ -50,18 +57,27 @@ namespace GameEngineX.Graphics {
             if (IsRendering)
                 return;
 
+            this.graphics = this.bufferedGraphics.Graphics;
+            this.graphics.SmoothingMode = SmoothingMode.HighSpeed;
+            this.graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            //this.graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
             this.transformStack.Clear();
             this.renderQueue.Clear();
+            this.renderQueueSize = 0;
             ResetRectangleCache();
+
+            int rTw = this.renderTarget.TargetRectangle.Width;
+            int rTh = this.renderTarget.TargetRectangle.Height;
+            int minSize = Math.Min(rTw, rTh);
+
+            //ApplyScaling(minSize / 2f, minSize / 2f);
+            //ApplyTranslation(rTw / (float)minSize, -rTh / (float)minSize);
         }
 
         internal void FinishRendering(Viewport viewport) {
             if (!IsRendering)
                 return;
-
-            this.graphics = this.bufferedGraphics.Graphics;
-            this.graphics.SmoothingMode = SmoothingMode.None;
-            this.graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
 
             foreach (Matrix m in this.transformStack) {
                 this.matrixPool.Put(m);
@@ -69,16 +85,17 @@ namespace GameEngineX.Graphics {
 
             Matrix viewprojectionMatrix = viewport.ViewProjectionMatrix;
 
-            IEnumerable<(Matrix transformationMatrix, int renderLayer, Action renderAction)> orderedRenderQueue = this.renderQueue.OrderByDescending(k => k.renderLayer);
+            (Matrix transformationMatrix, int renderLayer, Action renderAction)[] orderedRenderQueue = this.renderQueue.OrderByDescending(k => k.renderLayer).ToArray();
 
-            for (int i = 0; i < orderedRenderQueue.Count(); i++) {
-                Matrix m = orderedRenderQueue.ElementAt(i).transformationMatrix;
-                Action a = orderedRenderQueue.ElementAt(i).renderAction;
+            for (int i = 0; i < this.renderQueueSize; i++) {
+                var element = orderedRenderQueue[i];
+                Matrix m = element.transformationMatrix;
+                Action a = element.renderAction;
 
                 m.Multiply(viewprojectionMatrix, MatrixOrder.Append);
 
-                //this.graphics.DrawLine(GetPen(Color.White, 1), viewport.Width / 2f, 0, viewport.Width / 2f, viewport.Height);
-                //this.graphics.DrawLine(GetPen(Color.White, 1), 0, viewport.Height / 2f, viewport.Width, viewport.Height / 2f);
+                //this.graphics.DrawLine(GetPen(Color.White, 1), Viewport.Width / 2f, 0, Viewport.Width / 2f, Viewport.Height);
+                //this.graphics.DrawLine(GetPen(Color.White, 1), 0, Viewport.Height / 2f, Viewport.Width, Viewport.Height / 2f);
 
                 this.graphics.Transform = m;
 
@@ -86,8 +103,6 @@ namespace GameEngineX.Graphics {
 
                 this.graphics.Transform = IDENTITY;
             }
-
-            this.renderQueue.Clear();
 
             this.graphics = null;
 
@@ -123,28 +138,79 @@ namespace GameEngineX.Graphics {
         }
 
         #region Texture
-        public void DrawTexture(int renderLayer, Image image, float srcX, float srcY, float srcWidth, float srcHeight, float x, float y, float width, float height) {
+        public void DrawCenteredTexture(int renderLayer, Image image, float srcX, float srcY, float srcWidth, float srcHeight, float x, float y, float width, float height) {
             void Draw() => this.graphics.DrawImage(image, GetCachedRectangle(x - width / 2f, y - height / 2f, width, height), GetCachedRectangle(srcX, srcY, srcWidth, srcHeight), GraphicsUnit.Pixel);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, Draw));
+            this.renderQueueSize++;
         }
 
-        public void DrawTexture(int renderLayer, Image image, float x, float y, float width, float height) {
+        public void DrawCenteredTexture(int renderLayer, Image image, float x, float y, float width, float height) {
             void Draw() => this.graphics.DrawImage(image, x - width / 2f, y - height / 2f, width, height);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, Draw));
+            this.renderQueueSize++;
+        }
+
+        public void DrawTexture(int renderLayer, Image image, float x, float y, float width, float height) {
+            void Draw() => this.graphics.DrawImage(image, x, y, width, height);
+
+            this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, Draw));
+            this.renderQueueSize++;
         }
         #endregion
 
         #region Text
-        public void DrawText(int renderLayer, Color color, string fontName, int fontSize, string text, float x, float y) {
+        public void DrawText(int renderLayer, Color color, string fontName, float fontSize, string text, float x, float y) {
 
             Font f = GetFont(fontName, fontSize);
 
-            // TODO correct centered placement
-            Action a = () => this.graphics.DrawString(text, f, GetBrush(color), x, y + f.Height);
+            //float fontHeight = this.graphics.MeasureString(text, f).Height;
+            Action a = () => this.graphics.DrawString(text, f, GetBrush(color), x, y/* - fontHeight*/);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
+        }
+
+        public void DrawText(int renderLayer, Color color, string fontName, string text, float x, float y, (int width, int height) container) {
+            (int fontSize, float width, float height) data = GetMaximumFontSizeFitInRectangle(fontName, text, container);
+            
+            DrawText(renderLayer, color, fontName, data.fontSize, text, x, y);
+        }
+
+        public void DrawCenteredText(int renderLayer, Color color, string fontName, string text, float x, float y, (int width, int height) container) {
+            (int fontSize, float width, float height) data = GetMaximumFontSizeFitInRectangle(fontName, text, container);
+
+            //DrawCenteredRectangle(renderLayer, color, 1f, x, y, data.width, data.height);
+            DrawText(renderLayer, color, fontName, data.fontSize, text, x - data.width / 2f, y - data.height / 2f);
+        }
+
+        private (int fontSize, float width, float height) GetMaximumFontSizeFitInRectangle(string fontName, string text, (int width, int height) container, int minimumFontSize = 3, int maximumFontSize = 1000) {
+            Font newFont;
+            float prevWidth = 0;
+            float prevHeight = 0;
+            for (int newFontSize = minimumFontSize; ; newFontSize++) {
+                newFont = GetFont(fontName, newFontSize);
+                //newFont = new Font(font.FontFamily, newFontSize, font.Style);
+
+                SizeF size = MeasureDrawTextSize(text, newFont);
+                if (size.Width > container.width || size.Height > container.height || newFontSize > maximumFontSize)
+                    return (newFontSize - 1, prevWidth, prevHeight);
+
+                prevWidth = size.Width;
+                prevHeight = size.Height;
+            }
+        }
+
+        private SizeF MeasureDrawTextSize(string text, Font font) {
+            if (!IsRendering)
+                throw new RenderException("Cannot measure string when not rendering.");
+
+            SizeF s = this.graphics.MeasureString(text, font);
+            s.Width *= 0.975f;
+            s.Height *= 0.95f;
+
+            return s;
         }
         #endregion
 
@@ -167,6 +233,7 @@ namespace GameEngineX.Graphics {
             Action a = () => this.graphics.DrawLine(GetPen(color, size), x0, y0, x1, y1);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
         #endregion
 
@@ -191,22 +258,24 @@ namespace GameEngineX.Graphics {
 
                 Action a = () => this.graphics.DrawLine(GetPen(color, size), x + start.X, y + start.Y, x + end.X, y + end.Y);
                 this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+                this.renderQueueSize++;
             }
         }
         #endregion
 
         #region Rectangle
         public void FillCenteredRectangle(int renderLayer, Color color, float centerX, float centerY, float width, float height) {
-            FillRectangle(renderLayer, color, centerX - width / 2f, centerY - height / 2f, width, height);
+            FillRectangle(renderLayer, color, centerX - width / 2f, centerY + height / 2f, width, height);
         }
 
         public void FillRectangle(int renderLayer, Color color, float minX, float minY, float width, float height) {
-            width = Math.Max(0.1f, width);
-            height = Math.Max(0.1f, height);
+            width = Math.Max(0.0000001f, width);
+            height = Math.Max(0.000001f, height);
 
-            Action a = () => this.graphics.FillRectangle(GetBrush(color), minX, minY, width, height);
+            Action a = () => this.graphics.FillRectangle(GetBrush(color), minX, minY/* - height*/, width, height);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
 
         public void DrawCenteredRectangle(int renderLayer, Color color, float size, float centerX, float centerY, float width, float height) {
@@ -214,12 +283,13 @@ namespace GameEngineX.Graphics {
         }
 
         public void DrawRectangle(int renderLayer, Color color, float size, float minX, float minY, float width, float height) {
-            width = Math.Max(0.1f, width);
-            height = Math.Max(0.1f, height);
+            width = Math.Max(0.0000001f, width);
+            height = Math.Max(0.0000001f, height);
 
-            Action a = () => this.graphics.DrawRectangle(GetPen(color, size), minX, minY, width, height);
+            Action a = () => this.graphics.DrawRectangle(GetPen(color, size), minX, minY/* - height*/, width, height);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
         #endregion
 
@@ -239,12 +309,15 @@ namespace GameEngineX.Graphics {
         }
 
         public void FillEllipse(int renderLayer, Color color, float x, float y, float radiusX, float radiusY) {
-            radiusX = Math.Max(0.1f, radiusX);
-            radiusY = Math.Max(0.1f, radiusY);
+            radiusX = Math.Max(0.0000001f, radiusX);
+            radiusY = Math.Max(0.0000001f, radiusY);
 
-            Action a = () => this.graphics.FillEllipse(GetBrush(color), x - radiusX, y - radiusY, 2f * radiusX, 2f * radiusY);
+            float diameterX = radiusX * 2f;
+            float diameterY = radiusY * 2f;
+            Action a = () => this.graphics.FillEllipse(GetBrush(color), x - radiusX, y/* - diameterY*/ - radiusY, diameterX, diameterY);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
 
         public void DrawEllipse(int renderLayer, Color color, float size, Vector2 position, float radiusX, float radiusY) {
@@ -252,32 +325,39 @@ namespace GameEngineX.Graphics {
         }
 
         public void DrawEllipse(int renderLayer, Color color, float size, float x, float y, float radiusX, float radiusY) {
-            radiusX = Math.Max(0.1f, radiusX);
-            radiusY = Math.Max(0.1f, radiusY);
+            radiusX = Math.Max(0.0000001f, radiusX);
+            radiusY = Math.Max(0.0000001f, radiusY);
 
-            Action a = () => this.graphics.DrawEllipse(GetPen(color, size), x - radiusX, y - radiusY, 2f * radiusX, 2f * radiusY);
+            float diameterX = radiusX * 2f;
+            float diameterY = radiusY * 2f;
+            Action a = () => this.graphics.DrawEllipse(GetPen(color, size), x - radiusX, y/* - diameterY*/ - radiusY, diameterX, diameterY);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
         #endregion
 
         #region Pie
         public void FillPie(int renderLayer, Color color, float x, float y, float radius, float startAngle, float sweepAngle) {
-            radius = Math.Max(0.1f, radius);
-            sweepAngle = Math.Max(0.1f, sweepAngle);
+            radius = Math.Max(0.0000001f, radius);
+            sweepAngle = Math.Max(0.0000001f, sweepAngle);
 
-            Action a = () => this.graphics.FillPie(GetBrush(color), x - radius, y - radius, radius * 2f, radius * 2f, -startAngle, -sweepAngle);
+            float diameter = radius * 2f;
+            Action a = () => this.graphics.FillPie(GetBrush(color), x - radius, y/* - diameter*/ - radius, diameter, diameter, -startAngle, -sweepAngle);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
 
         public void DrawPie(int renderLayer, Color color, float size, float x, float y, float radius, float startAngle, float sweepAngle) {
-            radius = Math.Max(0.1f, radius);
-            sweepAngle = Math.Max(0.1f, sweepAngle);
+            radius = Math.Max(0.0000001f, radius);
+            sweepAngle = Math.Max(0.0000001f, sweepAngle);
 
-            Action a = () => this.graphics.DrawPie(GetPen(color, size), x - radius, y - radius, radius * 2f, radius * 2f, -startAngle, -sweepAngle);
+            float diameter = radius * 2f;
+            Action a = () => this.graphics.DrawPie(GetPen(color, size), x - radius, y/* - diameter*/ - radius, diameter, diameter, -startAngle, -sweepAngle);
 
             this.renderQueue.Add((CurrentTransformationMatrix, renderLayer, a));
+            this.renderQueueSize++;
         }
         #endregion
 
@@ -285,7 +365,7 @@ namespace GameEngineX.Graphics {
             if (!IsRendering)
                 return;
 
-            Matrix m = transform.LocalTransformationMatrix;
+            Matrix m = transform.GlobalTransformationMatrix;
             if (this.transformStack.Any())
                 m.Multiply(this.transformStack.Peek(), MatrixOrder.Append);
 
@@ -366,15 +446,15 @@ namespace GameEngineX.Graphics {
 
         private static readonly Dictionary<Color, Brush> cachedBrushes;
         private static readonly Dictionary<Color, Dictionary<float, Pen>> cachedPens;
-        private static readonly Dictionary<string, Dictionary<int, Font>> cachedFonts;
+        private static readonly Dictionary<string, Dictionary<float, Font>> cachedFonts;
 
         static Renderer() {
             Renderer.cachedBrushes = new Dictionary<Color, Brush>();
             Renderer.cachedPens = new Dictionary<Color, Dictionary<float, Pen>>();
-            Renderer.cachedFonts = new Dictionary<string, Dictionary<int, Font>>();
+            Renderer.cachedFonts = new Dictionary<string, Dictionary<float, Font>>();
 
             foreach (FontFamily font in FontFamily.Families) {
-                Renderer.cachedFonts[font.Name] = new Dictionary<int, Font>();
+                Renderer.cachedFonts[font.Name] = new Dictionary<float, Font>();
             }
         }
 
@@ -394,13 +474,13 @@ namespace GameEngineX.Graphics {
             return b;
         }
 
-        private static Font GetFont(string fontName, int size) {
+        private static Font GetFont(string fontName, float size) {
             if (!Renderer.cachedFonts.ContainsKey(fontName))
                 fontName = DEFAULT_FONT_NAME;
 
             size = Math.Max(1, size);
 
-            Dictionary<int, Font> fonts = Renderer.cachedFonts[fontName];
+            Dictionary<float, Font> fonts = Renderer.cachedFonts[fontName];
             Font f;
             if (!fonts.TryGetValue(size, out f)) {
                 f = new Font(fontName, size);

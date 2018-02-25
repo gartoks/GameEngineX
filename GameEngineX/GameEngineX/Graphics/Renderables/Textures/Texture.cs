@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 
-namespace GameEngineX.Graphics.Textures {
+namespace GameEngineX.Graphics.Renderables.Textures {
     public abstract class Texture : Renderable {
 
         public static Texture2D CreateTextureDisplay(int width, int height) {

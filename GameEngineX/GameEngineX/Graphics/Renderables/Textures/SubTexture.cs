@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 
-namespace GameEngineX.Graphics.Textures {
+namespace GameEngineX.Graphics.Renderables.Textures {
     public class SubTexture : Texture {
         private readonly TextureAtlas textureAtlas;
         private readonly Rectangle bounds;
@@ -12,7 +12,7 @@ namespace GameEngineX.Graphics.Textures {
         }
 
         internal override void Render(int renderLayer, Renderer renderer) {
-            renderer.DrawTexture(renderLayer, Image, this.bounds.X, this.bounds.Y, this.bounds.Width, this.bounds.Height, 0, 0, Width, Height);
+            renderer.DrawCenteredTexture(renderLayer, Image, this.bounds.X, this.bounds.Y, this.bounds.Width, this.bounds.Height, 0, 0, Width, Height);
         }
 
         public override int Width => this.bounds.Width;

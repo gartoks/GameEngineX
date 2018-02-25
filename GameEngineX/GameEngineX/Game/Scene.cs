@@ -1,60 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using GameEngineX.Game.GameObjects;
 using GameEngineX.Game.GameObjects.GameObjectComponents;
 
 namespace GameEngineX.Game {
-    [Serializable]
-    public class Scene {
+    public class Scene : ISerializable {
+        public static Scene Active => GameBase.Instance.ActiveScene;
+
         public readonly string Name;
 
         private readonly List<GameObject> gameObjects;
 
+        public Viewport MainViewport { get; private set; } 
         private readonly HashSet<Viewport> viewports;
-
-        //internal XMLElement Serialize() {
-        //    XMLElement root = new XMLElement("Scene");
-
-        //    root.AddDataElement("Name", Name);
-
-        //    XMLElement gOElement = new XMLElement("GameObjects");
-        //    root.AddElement(gOElement);
-
-        //    foreach (GameObject gameObject in this.gameObjects.Except(this.toBeRemovedGameObjects).Union(this.toBeAddedGameObjects).Where(gO => gO.Parent == null)) {
-        //        gOElement.AddElement(gameObject.Serialize());
-        //    }
-
-        //    return root;
-        //}
-
-        //internal static Scene Deserialize(XMLElement dataElement) {
-        //    if (!dataElement.HasNestedElements)
-        //        throw new SerializationException("Cannot deserialize scene.");
-
-        //    if (!dataElement.HasElement("Name") || !dataElement.GetElement("Name").HasData)
-        //        throw new SerializationException("Cannot deserialize scene.");
-        //    string name = dataElement.GetElement("Name").Data;
-
-        //    GameBase.Instance.CreateScene(name);
-        //    Scene scene = GameBase.Instance.GetScene(name);
-
-        //    if (!dataElement.HasElement("GameObjects") || dataElement.GetElement("GameObjects").HasData)
-        //        throw new SerializationException("Cannot deserialize scene.");
-
-        //    XMLElement gameObjectsElement = dataElement.GetElement("GameObjects");
-        //    foreach (XMLElement gOElement in gameObjectsElement.NestedElements) {
-        //        GameObject.Deserialize(gOElement, scene);
-        //    }
-
-        //    return scene;
-        //}
 
         internal Scene(string name) {
             Name = name;
 
             this.gameObjects = new List<GameObject>();
             this.viewports = new HashSet<Viewport>();
+        }
+
+        internal Scene(SerializationInfo info, StreamingContext ctxt) {
+            Name = info.GetString(nameof(Name));
+
+            this.gameObjects = (List<GameObject>)info.GetValue(nameof(gameObjects), typeof(List<GameObject>));
+            this.viewports = (HashSet<Viewport>)info.GetValue(nameof(viewports), typeof(HashSet<Viewport>));
+            this.updatingGameObjects = (List<GameObject>)info.GetValue(nameof(updatingGameObjects), typeof(List<GameObject>));
+            this.toBeAddedGameObjects = (List<GameObject>)info.GetValue(nameof(toBeAddedGameObjects), typeof(List<GameObject>));
+            this.toBeRemovedGameObjects = (List<GameObject>)info.GetValue(nameof(toBeRemovedGameObjects), typeof(List<GameObject>));
         }
 
         private readonly List<GameObject> updatingGameObjects = new List<GameObject>();
@@ -90,7 +65,13 @@ namespace GameEngineX.Game {
 
         internal void Render() {
             lock (this.viewports) {
+                if (MainViewport != null && (!MainViewport.IsActive || MainViewport.RenderTarget != null))
+                    FindMainViewport();
+
                 foreach (Viewport viewport in this.viewports) {
+                    if (viewport.IsActive && viewport.RenderTarget == null && !viewport.Equals(MainViewport))
+                        continue;
+
                     viewport.Render();
                 }
             }
@@ -105,13 +86,40 @@ namespace GameEngineX.Game {
         internal void AddViewport(Viewport viewport) {
             lock (this.viewports) {
                 this.viewports.Add(viewport);
+
+                if (viewport.IsActive && viewport.RenderTarget == null)
+                    FindMainViewport();
             }
         }
 
         internal void RemoveViewport(Viewport viewport) {
             lock (this.viewports) {
                 this.viewports.Remove(viewport);
+                
+                if (viewport.Equals(MainViewport))
+                    FindMainViewport();
             }
+        }
+
+        private void FindMainViewport() {
+            foreach (Viewport viewport in this.viewports) {
+                if (!viewport.IsActive || viewport.RenderTarget != null)
+                    continue;
+
+                MainViewport = viewport;
+                return;
+            }
+        }
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context) {
+            info.AddValue(nameof(Name), Name);
+            info.AddValue(nameof(gameObjects), gameObjects);
+            lock (this.viewports) {
+                info.AddValue(nameof(viewports), viewports);
+            }
+            info.AddValue(nameof(updatingGameObjects), updatingGameObjects);
+            info.AddValue(nameof(toBeAddedGameObjects), toBeAddedGameObjects);
+            info.AddValue(nameof(toBeRemovedGameObjects), toBeRemovedGameObjects);
         }
     }
 }

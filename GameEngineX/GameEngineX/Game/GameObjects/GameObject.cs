@@ -4,15 +4,15 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using GameEngineX.Game.GameObjects.GameObjectComponents;
+using GameEngineX.Game.GameObjects.Utility;
+using GameEngineX.Game.UserInterface;
 using GameEngineX.Graphics;
 using GameEngineX.Utility.Exceptions;
 using GameEngineX.Utility.Math;
 
 namespace GameEngineX.Game.GameObjects {
-    public sealed class GameObject {
-        private static uint NextID = 0;
-
-        private readonly uint ID;
+    public sealed class GameObject : ISerializable {
+        private readonly Guid ID;
 
         private bool isAlive;
 
@@ -26,7 +26,7 @@ namespace GameEngineX.Game.GameObjects {
         private GameObject parent;
         private readonly HashSet<GameObject> children;
 
-        public Transform Transform { get; }
+        private readonly Transform transform;
 
         public GameObject(string name)
             : this(name, null, 0, null) { }
@@ -35,12 +35,12 @@ namespace GameEngineX.Game.GameObjects {
             : this(name, null, position, rotation, scale) { }
 
         public GameObject(string name, GameObject parent = null, Vector2 position = null, float rotation = 0, Vector2 scale = null)
-            : this(name, parent, position, rotation, scale, GameBase.Instance.ActiveSceneObj) {
+            : this(name, parent, position, rotation, scale, GameBase.Instance.ActiveScene) {
         }
 
         internal GameObject(string name, GameObject parent = null, Vector2 position = null, float rotation = 0, Vector2 scale = null, Scene scene = null) {
             if (scene == null)
-                scene = GameBase.Instance.ActiveSceneObj;
+                scene = GameBase.Instance.ActiveScene;
 
             if (position == null)
                 position = new Vector2();
@@ -48,7 +48,7 @@ namespace GameEngineX.Game.GameObjects {
             if (scale == null)
                 scale = new Vector2(1, 1);
 
-            ID = NextID++;
+            ID = Guid.NewGuid();
 
             Name = name;
             IsEnabled = true;
@@ -56,17 +56,30 @@ namespace GameEngineX.Game.GameObjects {
             this.components = new List<GameObjectComponent>();
             this.renderables = new List<IRendering>();
 
-            Transform = new Transform(this, position, rotation, scale);
+            this.transform = new Transform(this, position, rotation, scale);
 
             Parent = parent;
             this.children = new HashSet<GameObject>();
 
-            if (GameBase.Instance.ActiveSceneObj == null)
+            if (GameBase.Instance.ActiveScene == null)
                 throw new GameStateException("Cannote create GameObject when no scene is active.");
 
             scene.AddGameObject(this);
 
             this.isAlive = true;
+        }
+
+        public GameObject(SerializationInfo info, StreamingContext ctxt) {
+            ID = Guid.Parse(info.GetString(nameof(ID)));
+            isAlive = info.GetBoolean(nameof(isAlive));
+            name = info.GetString(nameof(name));
+            IsEnabled = info.GetBoolean(nameof(IsEnabled));
+            components = (List<GameObjectComponent>)info.GetValue(nameof(components), typeof(List<GameObjectComponent>));
+            parent = (GameObject)info.GetValue(nameof(parent), typeof(GameObject));
+            children = (HashSet<GameObject>)info.GetValue(nameof(children), typeof(HashSet<GameObject>));
+            transform = (Transform)info.GetValue(nameof(transform), typeof(Transform));
+            renderingChildren = (List<GameObject>)info.GetValue(nameof(renderingChildren), typeof(List<GameObjectComponent>));
+            updatingChildren = (List<GameObject>)info.GetValue(nameof(updatingChildren), typeof(List<GameObjectComponent>));
         }
 
         //Position.OnChanged += (v, x, y) => {
@@ -166,7 +179,19 @@ namespace GameEngineX.Game.GameObjects {
         }
 
         internal GameObjectComponent AddComponent(Type t, bool isEnabled, IEnumerable<(string fieldName, object fielValue)> fields) {
-            ConstructorInfo ctor = t.GetConstructor(Type.EmptyTypes);
+            if (t.IsAbstract)
+                throw new ArgumentException("Cannot add an abstract component.", nameof(t));
+
+            IEnumerable<RequiredComponents> requiredComponentCollection = t.GetCustomAttributes<RequiredComponents>(true);
+            foreach (RequiredComponents requiredComponents in requiredComponentCollection) {
+                GameObjectComponentSearchMode searchMode = requiredComponents.InHierarchy ? GameObjectComponentSearchMode.ParentalHierarchy : GameObjectComponentSearchMode.This;
+                foreach (Type requiredComponent in requiredComponents.Required) {
+                    if (!GetComponents(requiredComponent, searchMode, true).Any())
+                        AddComponent(requiredComponent, true, new(string fieldName, object fielValue)[0]);
+                }
+            }
+
+            ConstructorInfo ctor = t.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
             GameObjectComponent component = ctor.Invoke(new object[0]) as GameObjectComponent;
             component.GameObject = this;
 
@@ -210,18 +235,38 @@ namespace GameEngineX.Game.GameObjects {
             this.renderables.Sort((x, y) => y.RenderLayer.CompareTo(x.RenderLayer));
         }
 
-        public T GetComponent<T>() {
-            return GetComponents<T>().FirstOrDefault();
+        public T GetComponent<T>(GameObjectComponentSearchMode searchMode = GameObjectComponentSearchMode.This, bool includeDerivations = true) where T : GameObjectComponent {
+            return GetComponents<T>(searchMode, includeDerivations).FirstOrDefault();
         }
 
-        public IEnumerable<T> GetComponents<T>(bool includeChildren = false) {
-            IEnumerable<T> comps = FindComponents(c => c is T).Cast<T>();
+        public IEnumerable<T> GetComponents<T>(GameObjectComponentSearchMode searchMode = GameObjectComponentSearchMode.This, bool includeDerivations = true) where T : GameObjectComponent {
+            return GetComponents(typeof(T), searchMode, includeDerivations).Cast<T>();
+        }
 
-            if (!includeChildren)
+        private IEnumerable<GameObjectComponent> GetComponents(Type t, GameObjectComponentSearchMode searchMode, bool includeDerivations) {
+            if (!t.IsSubclassOf(typeof(GameObjectComponent)))
+                throw new ArgumentException(nameof(t));
+
+            IEnumerable<GameObjectComponent> comps;
+            if (includeDerivations)
+                comps = FindComponents(c => c.GetType() == t || c.GetType().IsSubclassOf(t));
+            else
+                comps = FindComponents(c => c.GetType() == t);
+
+            if (searchMode == GameObjectComponentSearchMode.This)
                 return comps;
 
-            foreach (GameObject child in this.children) {
-                comps = comps.Concat(child.GetComponents<T>(true));
+            if ((searchMode & GameObjectComponentSearchMode.ChildHierarchy) > 0) {
+                foreach (GameObject child in this.children) {
+                    comps = comps.Concat(child.GetComponents(t, GameObjectComponentSearchMode.ChildHierarchy, includeDerivations));
+                }
+            }
+
+            if ((searchMode & GameObjectComponentSearchMode.ParentalHierarchy) > 0 && Parent != null) {
+                comps = comps.Concat(Parent.GetComponents(t, GameObjectComponentSearchMode.ParentalHierarchy, includeDerivations));
+                //foreach (GameObject parent in GetParentalHierarchy(false)) {
+                //    comps = comps.Concat(parent.GetComponents(t, GameObjectComponentSearchMode.This, includeDerivations));
+                //}
             }
 
             return comps;
@@ -238,6 +283,18 @@ namespace GameEngineX.Game.GameObjects {
             }
 
             return comps;
+        }
+
+        public IEnumerable<GameObject> GetParentalHierarchy(bool includeCurrent = true) {
+            GameObject gO = includeCurrent ? this : this.parent;
+            while (gO != null) {
+                yield return gO;
+                gO = gO.Parent;
+            }
+        }
+
+        public GameObject GetRootGameObject() {
+            return Parent == null ? this : Parent.GetRootGameObject();
         }
 
         public GameObject Parent {
@@ -302,6 +359,8 @@ namespace GameEngineX.Game.GameObjects {
             }
         }
 
+        public Transform Transform => this.transform;
+
         public bool IsAlive => this.isAlive;
 
         public string Name {
@@ -320,70 +379,17 @@ namespace GameEngineX.Game.GameObjects {
             return ID.GetHashCode();
         }
 
-        //internal XMLElement Serialize() {
-        //    XMLElement root = new XMLElement("GameObject");
-
-        //    root.AddDataElement("IsAlive", IsAlive.ToString());
-        //    root.AddDataElement("Name", Name);
-        //    root.AddDataElement("IsEnabled", IsEnabled.ToString());
-
-        //    root.AddElement(Transform.Serialize());
-
-        //    XMLElement componentsElement = new XMLElement("Components");
-        //    root.AddElement(componentsElement);
-        //    foreach (GameObjectComponent component in this.components) {
-        //        componentsElement.AddElement(component.Serialize());
-        //    }
-
-        //    XMLElement childrenElement = new XMLElement("Children");
-        //    root.AddElement(childrenElement);
-        //    foreach (GameObject child in Children) {
-        //        childrenElement.AddElement(child.Serialize());
-        //    }
-
-        //    return root;
-        //}
-
-        //internal static GameObject Deserialize(XMLElement dataElement, Scene scene) {
-
-        //    if (!dataElement.GetElement("Name").HasData)
-        //        throw new SerializationException("Cannot deserialize game object.");
-        //    string name = dataElement.GetElement("Name").Data;
-
-        //    if (!dataElement.HasElement("IsAlive"))
-        //        throw new SerializationException("Cannot deserialize game object.");
-
-        //    bool isAlive = true;
-        //    if (!dataElement.GetElement("IsAlive").HasData || !bool.TryParse(dataElement.GetElement("IsAlive").Data, out isAlive))
-        //        throw new SerializationException("Cannot deserialize game object.");
-
-        //    if (!dataElement.GetElement("IsEnabled").HasData || !bool.TryParse(dataElement.GetElement("IsEnabled").Data, out var isEnabled))
-        //        throw new SerializationException("Cannot deserialize game object.");
-
-        //    GameObject gO = new GameObject(name, null, null, 0, null, scene);
-        //    gO.isAlive = isAlive;
-        //    gO.IsEnabled = isEnabled;
-
-        //    if (!dataElement.HasElement("Transform"))
-        //        throw new SerializationException("Cannot deserialize game object.");
-        //    gO.Transform.Deserialize(dataElement.GetElement("Transform"));
-
-        //    if (!dataElement.HasElement("Components") || dataElement.GetElement("Components").HasData)
-        //        throw new SerializationException("Cannot deserialize game object.");
-
-        //    foreach (XMLElement e in dataElement.GetElement("Components").NestedElements) {
-        //        GameObjectComponent.Deserialize(e, gO);
-        //    }
-
-        //    if (!dataElement.HasElement("Children") || dataElement.GetElement("Children").HasData)
-        //        throw new SerializationException("Cannot deserialize game object.");
-
-        //    foreach (XMLElement e in dataElement.GetElement("Children").NestedElements) {
-        //        GameObject child = Deserialize(e, scene);
-        //        child.Parent = gO;
-        //    }
-
-        //    return gO;
-        //}
+        public void GetObjectData(SerializationInfo info, StreamingContext context) {
+            info.AddValue(nameof(ID), ID.ToString());
+            info.AddValue(nameof(isAlive), isAlive);
+            info.AddValue(nameof(name), name);
+            info.AddValue(nameof(IsEnabled), IsEnabled);
+            info.AddValue(nameof(components), components);
+            info.AddValue(nameof(parent), parent);
+            info.AddValue(nameof(children), children);
+            info.AddValue(nameof(transform), transform);
+            info.AddValue(nameof(renderingChildren), renderingChildren);
+            info.AddValue(nameof(updatingChildren), updatingChildren);
+        }
     }
 }

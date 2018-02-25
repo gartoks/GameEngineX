@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Runtime.Serialization;
 using GameEngineX.Graphics;
 using GameEngineX.Utility.Math;
 
 namespace GameEngineX.Game.GameObjects.GameObjectComponents {
-    [Serializable]
-    public sealed class Viewport : GameObjectComponent {
+    public sealed class Viewport : GameObjectComponent, ISerializable {
         private Renderer renderer;
         private IRenderTarget renderTarget;
         private (float width, float height) targetSize = (1, 1);
@@ -18,8 +18,22 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
 
         private Matrix viewMatrix = null;
 
-        //internal Viewport() {
+        //internal Viewport(SerializationInfo info, StreamingContext ctxt) 
+        //    : base(info, ctxt) {
 
+            //float tSW = info.GetSingle(nameof(targetSize) + "Width");
+            //float tSH = info.GetSingle(nameof(targetSize) + "Height");
+            //targetSize = (tSW, tSH);
+
+            //float sW = info.GetSingle(nameof(size) + "Width");
+            //float sH = info.GetSingle(nameof(size) + "Height");
+            //size = (sW, sH);
+
+            //zoom = info.GetSingle(nameof(zoom));
+            //viewMatrix = MatrixExtensions.CreateMatrix((float[])info.GetValue(nameof(viewMatrix), typeof(float[])));
+
+            //object rTObj = info.GetValue(nameof(renderTarget), typeof(IRenderTarget));
+            //RenderTarget =    TODO
         //}
 
         public override void Initialize() {
@@ -38,26 +52,24 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
 
             Zoom = 1;
 
-            GameBase.Instance.ActiveSceneObj.AddViewport(this);
+            GameBase.Instance.ActiveScene.AddViewport(this);
         }
 
         public override void Death() {
-            GameBase.Instance.ActiveSceneObj.RemoveViewport(this);
+            GameBase.Instance.ActiveScene.RemoveViewport(this);
 
             this.renderer?.Dispose();
         }
 
         private readonly List<GameObject> renderingGameObjects = new List<GameObject>();
         internal void Render() {
-            if (RenderTarget == null || !IsEnabled || !GameObject.IsEnabled || !GameObject.IsAlive)
+            if (!IsActive)
                 return;
 
-            (float x, float y, float width, float height) wB = ExpandedWorldBounds(2);
+            Rectangle wB = ExpandedWorldBounds(2);
 
-            //IEnumerable<GameObject> Gos = GameBase.Instance.ActiveSceneObj.GameObjects;
-
-            this.renderingGameObjects.Clear();
-            this.renderingGameObjects.AddRange(GameBase.Instance.ActiveSceneObj.GameObjects.Where(gO => gO.Parent == null && wB.RectangleContains(gO.Transform.Position.X, gO.Transform.Position.Y)));  // TODO may need to lock gamebase GOs
+            this.renderingGameObjects.Clear();  // TODO
+            this.renderingGameObjects.AddRange(GameBase.Instance.ActiveScene.GameObjects.Where(gO => gO.Parent == null && wB.Contains(gO.Transform.Position.X, gO.Transform.Position.Y)));  // TODO may need to lock gamebase GOs
 
             this.renderer.BeginRendering();
 
@@ -74,12 +86,53 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
             this.renderer.FinishRendering(this);
         }
 
-        public bool IsVisisble(float x, float y, float radius = 0) {
-            return WorldBounds.RectangleContains(x, y, radius);
+        public void ScreenToWorldCoordinates(float sx, float sy, out float wx, out float wy) {
+            wx = sx / targetSize.width;
+            wy = sy / targetSize.height;
+            Rectangle worldBounds = WorldBounds;
+
+            wy = 1f - wy;
+
+            wx *= worldBounds.Width;
+            wy *= worldBounds.Height;
+
+            wx += worldBounds.X - worldBounds.Center.x;
+            wy += worldBounds.Y - worldBounds.Center.y;
+        }
+
+        public (float x, float y) ScreenToWorldCoordinates((float x, float y) pos) {
+            ScreenToWorldCoordinates(pos.x, pos.y, out float x, out float y);
+
+            pos.x = x;
+            pos.y = y;
+
+            return pos;
+        }
+
+        public void WorldToScreenCoordinates(float wx, float wy, out float sx, out float sy) {
+            Rectangle worldBounds = WorldBounds;
+
+            sx = wx - worldBounds.X;
+            sy = wy - worldBounds.Y;
+
+            sx /= worldBounds.Width;
+            sy /= worldBounds.Height;
+
+            sx *= targetSize.width;
+            sy *= targetSize.height;
+        }
+
+        public (float x, float y) WorldToScreenCoordinates((float x, float y) pos) {
+            WorldToScreenCoordinates(pos.x, pos.y, out float x, out float y);
+
+            pos.x = x;
+            pos.y = y;
+
+            return pos;
         }
 
         public bool IsVisible(float x, float y, float radius = 0) {
-            return WorldBounds.Intersects(x, y, radius);
+            return WorldBounds.Contains(x, y, radius);
         }
 
         public IRenderTarget RenderTarget {
@@ -87,16 +140,18 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
             set {
                 this.renderTarget = value;
 
-                if (value != null) {
-                    this.targetSize.width = renderTarget.TargetRectangle.Width;
-                    this.targetSize.height = renderTarget.TargetRectangle.Height;
-                } else {
-                    this.targetSize.width = 1;
-                    this.targetSize.height = 1;
-                }
+                value = value ?? new ScreenRenderTarget();
 
+                //if (value != null) {
+                float min = Math.Min(value.TargetRectangle.Width, value.TargetRectangle.Height);
+                    this.targetSize.width = min;
+                    this.targetSize.height = min;
+                //} else {
+                    this.targetSize.width = value.TargetRectangle.Width;
+                    this.targetSize.height = value.TargetRectangle.Height;
+                //}
 
-                this.renderer = value == null ? null : new Renderer(Renderer.BACKGROUND_COLOR, value);
+                this.renderer = new Renderer(Renderer.BACKGROUND_COLOR, value);
             }
         }
 
@@ -124,33 +179,56 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
             Zoom = 1;
         }
 
-        public (float x, float y, float width, float height) WorldBounds => (Transform.Position.X - Width / 2f, Transform.Position.Y - Height / 2f, Width, Height);
+        public Rectangle WorldBounds {
+            get {
+                float ratio = targetSize.height / targetSize.width;
+                float x = Zoom * Width / (2f * ratio);
+                float y = Zoom * Height / 2f;
 
-        private (float x, float y, float width, float height) ExpandedWorldBounds(float scale) {
-            return (Transform.Position.X - scale * Width / 2f, Transform.Position.Y - scale * Height / 2f, Width, scale * Height);
+                return new Rectangle(Transform.Position.X - x, Transform.Position.Y - y, Width / ratio, Height);
+            }
         }
 
-        //public void ZoomToWorldWidth(float worldWidth) {
-        //    Zoom = PixelPerMeter * worldWidth / size.width;
-        //}
+        private Rectangle ExpandedWorldBounds(float scale) {
+            float ratio = targetSize.height / targetSize.width;
+            float x = scale * Zoom * Width / (2f * ratio);
+            float y = scale * Zoom * Height / 2f;
 
-        //public void ZoomToWorldHeight(float worldHeight) {
-        //    Zoom = PixelPerMeter * worldHeight / size.height;
-        //}
+            return new Rectangle(Transform.Position.X - x, Transform.Position.Y - y, scale * Width / ratio, scale * Height);
+        }
 
         internal Matrix ViewProjectionMatrix {
             get {
+                Matrix m = new Matrix();
+
                 if (this.viewMatrix == null) {
                     this.viewMatrix = new Matrix();
                     this.viewMatrix.Scale(Zoom * (this.targetSize.width / Width) * targetSize.height / targetSize.width, Zoom * (this.targetSize.height / Height));
                     this.viewMatrix.Rotate(0, MatrixOrder.Append);// TODO
                     //this.viewMatrix.Translate(this.targetSize.width / 2f - Transform.Position.X, this.targetSize.height / 2f + Transform.Position.Y, MatrixOrder.Append);
                     this.viewMatrix.Translate(this.targetSize.width / 2f, this.targetSize.height / 2f, MatrixOrder.Append);
-
                 }
 
                 return this.viewMatrix;
             }
         }
+
+        public new void GetObjectData(SerializationInfo info, StreamingContext context) {
+            base.GetObjectData(info, context);
+
+            info.AddValue(nameof(targetSize) + "Width", targetSize.width);
+            info.AddValue(nameof(targetSize) + "Height", targetSize.height);
+
+            info.AddValue(nameof(size) + "Width", size.width);
+            info.AddValue(nameof(size) + "Height", size.height);
+
+            info.AddValue(nameof(zoom), zoom);
+
+            info.AddValue(nameof(viewMatrix.Elements), typeof(float[]));
+
+            //object rTObj = info.GetValue(nameof(renderTarget), typeof(IRenderTarget));
+            //RenderTarget =
+        }
+
     }
 }

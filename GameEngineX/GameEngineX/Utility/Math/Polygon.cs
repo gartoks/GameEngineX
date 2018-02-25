@@ -292,6 +292,8 @@ namespace GameEngineX.Utility.Math {
             return true;
         }
 
+        public override int GetHashCode() => -501195594 + EqualityComparer<Vector2[]>.Default.GetHashCode(this.points);
+
         private bool EdgeIntersectsLine(float x1, float y1, float x2, float y2) {
             float d1x = x2 - x1;
             float d1y = y2 - y1;
@@ -354,5 +356,6 @@ namespace GameEngineX.Utility.Math {
             area /= 2f;
             return area;
         }
+
     }
 }

@@ -304,6 +304,14 @@ namespace GameEngineX.Utility.Math {
             return a;
         }
 
+        public static float NormalizeAngle(this float a) {
+            return (float)NormalizeAngle((double)a);
+        }
+
+        public static void NormalizeAngle(ref float a) {
+            a = a.NormalizeAngle();
+        }
+
         public static double NormalizeAngle(this double a) {
             while (a < 0)
                 a += TwoPI;

@@ -46,26 +46,56 @@
   <ItemGroup>
     <Compile Include="Application\ApplicationBase.cs" />
     <Compile Include="Application\ApplicationInitializationParameters.cs" />
+    <Compile Include="Application\Logging\Log.cs" />
+    <Compile Include="Application\Logging\LogWindow.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Application\Logging\LogWindow.Designer.cs">
+      <DependentUpon>LogWindow.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Application\Logging\LogType.cs" />
     <Compile Include="Game\GameBase.cs" />
     <Compile Include="Game\GameObjects\GameObject.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\GameObjectComponent.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\GUIHandler.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\Sprite.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIButton.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIComponent.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIInteractableComponent.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUILabel.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIPanel.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIProgressbar.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUISlider.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIToggleButton.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIDebugDisplay.cs" />
+    <Compile Include="Game\GameObjects\Utility\GameObjectComponentSearchMode.cs" />
+    <Compile Include="Game\UserInterface\GUIComponentInteractionState.cs" />
+    <Compile Include="Game\UserInterface\GUIInteractionGraphics.cs" />
+    <Compile Include="Game\UserInterface\RequiredComponents.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\Viewport.cs" />
     <Compile Include="Game\GameObjects\Transform.cs" />
     <Compile Include="Game\Scene.cs" />
     <Compile Include="Graphics\IRendering.cs" />
     <Compile Include="Graphics\IRenderTarget.cs" />
     <Compile Include="Graphics\Renderable.cs" />
+    <Compile Include="Graphics\Renderables\CircleShape.cs" />
+    <Compile Include="Graphics\Renderables\CustomShape.cs" />
+    <Compile Include="Graphics\Renderables\EllipseShape.cs" />
+    <Compile Include="Graphics\Renderables\RectangleShape.cs" />
     <Compile Include="Graphics\Renderer.cs" />
-    <Compile Include="Graphics\Textures\SubTexture.cs" />
-    <Compile Include="Graphics\Textures\Texture.cs" />
-    <Compile Include="Graphics\Textures\Texture2D.cs" />
-    <Compile Include="Graphics\Textures\TextureAtlas.cs" />
+    <Compile Include="Graphics\RenderException.cs" />
+    <Compile Include="Graphics\ScreenRenderTarget.cs" />
+    <Compile Include="Graphics\Renderables\Textures\SubTexture.cs" />
+    <Compile Include="Graphics\Renderables\Textures\Texture.cs" />
+    <Compile Include="Graphics\Renderables\Textures\Texture2D.cs" />
+    <Compile Include="Graphics\Renderables\Textures\TextureAtlas.cs" />
     <Compile Include="Input\InputHandler.cs" />
     <Compile Include="Input\MouseButton.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\Resource.cs" />
     <Compile Include="Resources\ResourceLoader.cs" />
     <Compile Include="Resources\ResourceLoaders\TextLoader.cs" />
+    <Compile Include="Resources\ResourceLoaders\TextureLoader.cs" />
     <Compile Include="Resources\ResourceLoadingParameters.cs" />
     <Compile Include="Resources\ResourceLoadingTask.cs" />
     <Compile Include="Resources\ResourceManager.cs" />
@@ -76,14 +106,22 @@
     <Compile Include="Utility\DataStructures\QuadTree.cs" />
     <Compile Include="Utility\Exceptions\GameStateException.cs" />
     <Compile Include="Utility\Exceptions\ResourceLoadingException.cs" />
+    <Compile Include="Utility\Extensions\MatrixExtensions.cs" />
     <Compile Include="Utility\Math\MathUtility.cs" />
     <Compile Include="Utility\Math\NoiseGenerator.cs" />
     <Compile Include="Utility\Math\Polygon.cs" />
+    <Compile Include="Utility\Math\Rectangle.cs" />
     <Compile Include="Utility\Math\Vector2.cs" />
     <Compile Include="Utility\PingPong.cs" />
     <Compile Include="Utility\SerializationUtility.cs" />
     <Compile Include="Utility\Tags.cs" />
     <Compile Include="Utility\TimeTracker.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Application\Logging\LogWindow.resx">
+      <DependentUpon>LogWindow.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

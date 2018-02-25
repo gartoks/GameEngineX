@@ -2,14 +2,14 @@
 using GameEngineX.Input;
 using GameEngineX.Utility;
 using System;
-using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
+using GameEngineX.Application.Logging;
 using GameEngineX.Graphics;
 using GameEngineX.Resources;
 
 namespace GameEngineX.Application {
-    public abstract class ApplicationBase : IRenderTarget {
+    public abstract class ApplicationBase {
 
         private static ApplicationBase instance;
         public static ApplicationBase Instance => instance;
@@ -24,6 +24,8 @@ namespace GameEngineX.Application {
         private Thread renderThread;
         private Thread logicThread;
         private bool running;
+
+        private LogWindow logWindow;
 
         private GameBase game;
 
@@ -44,6 +46,15 @@ namespace GameEngineX.Application {
             //this.gameAreaWidth = gameArea.Width;
             //this.gameAreaHeight = gameArea.Height;
             this.gameArea.SizeChanged += GameArea_SizeChanged;
+
+            // initialize logging
+            Log.Initialize(parameters.LoggingMessageColor, parameters.LoggingWarningColor, parameters.LoggingErrorColor);
+
+            if (parameters.ShowLogWindow) {
+                this.logWindow = new LogWindow();
+                Log.OnLog += this.logWindow.AddLine;
+                this.logWindow.Show();
+            }
 
             ResourceManager.Initialize();
 
@@ -80,6 +91,7 @@ namespace GameEngineX.Application {
                 InputHandler.Update();
 
                 this.upsTimer.FullTick(this.game.Update, !IsSimulation);
+                logWindow?.SetUpsFps(UpdatesPerSecond, FramesPerSecond);
 
                 InputHandler.LateUpate();
             }
@@ -120,7 +132,7 @@ namespace GameEngineX.Application {
 
         public float Time => this.upsTimer.RunTimeMilliseconds() / 1000f;
 
-        public Control GameArea => this.gameArea;
+        internal Control GameArea => this.gameArea;
 
         public abstract string Name { get; }
 
@@ -129,9 +141,5 @@ namespace GameEngineX.Application {
         public int FramesPerSecond => this.fpsTimer.TicksPerSecond;
 
         public abstract bool IsWindowVisible { get; }
-
-        public System.Drawing.Graphics Graphics => System.Drawing.Graphics.FromHwnd(GameArea.Handle);
-
-        public Rectangle TargetRectangle => GameArea.ClientRectangle;
     }
 }

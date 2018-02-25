@@ -1,5 +1,5 @@
 ﻿namespace GameEngineX.Input {
     public enum MouseButton {
-        Left, Right, Middle
+        Left = 1, Right = 2, Middle = 4
     }
 }

@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Drawing.Drawing2D;
+using System.Runtime.Serialization;
 using GameEngineX.Utility.Math;
 
 namespace GameEngineX.Game.GameObjects {
-    public class Transform {
+    public class Transform : ISerializable {
         public readonly GameObject GameObject;
 
         private readonly Vector2 position = new Vector2();
@@ -22,6 +23,13 @@ namespace GameEngineX.Game.GameObjects {
             Scale = scale == null ? new Vector2(1, 1) : scale;
 
             //UITransform = false;
+        }
+
+        internal Transform(SerializationInfo info, StreamingContext ctxt) {
+            GameObject = (GameObject)info.GetValue(nameof(GameObject), typeof(GameObject));
+            position = (Vector2)info.GetValue(nameof(position), typeof(Vector2));
+            scale = (Vector2)info.GetValue(nameof(scale), typeof(Vector2));
+            rotation = (float)info.GetValue(nameof(rotation), typeof(float));
         }
 
         public Vector2 LocalPosition {
@@ -83,7 +91,7 @@ namespace GameEngineX.Game.GameObjects {
         private Matrix CalculateGlobalTransformationMatrix(Matrix m) {
             GameObject.Parent?.Transform.CalculateGlobalTransformationMatrix(m);
 
-            m.Multiply(LocalTransformationMatrix);
+            m.Multiply(LocalTransformationMatrix, MatrixOrder.Append);
 
             return m;
         }
@@ -93,7 +101,7 @@ namespace GameEngineX.Game.GameObjects {
                 //if (this.transformationMatrix == null) {
                 Matrix m = new Matrix();
                 m.Scale(Scale.X, Scale.Y);
-                m.Rotate(-Rotation * MathUtility.RadToDegf, MatrixOrder.Append);// TODO
+                m.Rotate(-Rotation * MathUtility.RadToDegf, MatrixOrder.Append);
                 m.Translate(LocalPosition.X, -LocalPosition.Y, MatrixOrder.Append);
                 //}
 
@@ -101,29 +109,13 @@ namespace GameEngineX.Game.GameObjects {
             }
         }
 
-        //internal XMLElement Serialize() {
-        //    XMLElement root = new XMLElement("Transform");
+        public override string ToString() => $"[{Position},{Scale},{Rotation}]";
 
-        //    root.AddElement(Position.ToXML("Position"));
-        //    root.AddElement(Scale.ToXML("Scale"));
-        //    root.AddDataElement("Rotation", Rotation.ToString());
-
-        //    return root;
-        //}
-
-        //internal void Deserialize(XMLElement dataElement) {
-        //    if (!dataElement.HasElement("Position") || !dataElement.HasElement("Scale") || !dataElement.HasElement("Rotation"))
-        //        throw new SerializationException("Cannot parse transform attribute.");
-
-        //    this.position.FromXML(dataElement.GetElement("Position"));
-        //    this.scale.FromXML(dataElement.GetElement("Scale"));
-
-        //    float rot = 0;
-        //    XMLElement rotElement = dataElement.GetElement("Rotation");
-        //    if (!rotElement.HasData || !float.TryParse(rotElement.Data, out rot))
-        //        throw new SerializationException("Cannot parse transform attribute.");
-        //    this.rotation = rot;
-        //}
-
+        public void GetObjectData(SerializationInfo info, StreamingContext context) {
+            info.AddValue(nameof(GameObject), GameObject);
+            info.AddValue(nameof(position), position);
+            info.AddValue(nameof(scale), scale);
+            info.AddValue(nameof(rotation), rotation);
+        }
     }
 }

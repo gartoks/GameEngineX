@@ -1,6 +1,7 @@
 ﻿using System;
 
 namespace GameEngineX.Utility.Math {
+    [Serializable]
     public class Vector2 {
         public static Vector2 ZERO => new Vector2(0, 0);
         public static Vector2 IDENTITY => new Vector2(1, 1);

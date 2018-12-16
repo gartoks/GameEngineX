@@ -6,6 +6,6 @@ namespace TestGame {
 
         public override string Name => "TestApplication";
 
-        public override bool IsWindowVisible => MainForm.Instance.WindowState != FormWindowState.Minimized;
+        public override Form Form => MainForm.Instance;
     }
 }

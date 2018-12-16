@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using GameEngineX.Resources.ResourceLoaders;
 using GameEngineX.Utility.Exceptions;
 
@@ -15,6 +17,8 @@ namespace GameEngineX.Resources {
         private static int loadingQueueSize;
         private static int highestPriority;
 
+        private static ConcurrentDictionary<string, object> queuedResources;
+
         static ResourceManager() {
             ResourceManager.loaders = new Dictionary<Type, Dictionary<Type, IResourceLoader>>();
 
@@ -24,11 +28,13 @@ namespace GameEngineX.Resources {
             ResourceManager.loadingQueue = new SortedDictionary<int, Queue<ResourceLoadingTask>>();
             ResourceManager.loadingQueueSize = 0;
             ResourceManager.highestPriority = -1;
+
+            ResourceManager.queuedResources = new ConcurrentDictionary<string, object>();
         }
 
         internal static void Initialize() {
             RegisterResourceLoader(new TextLoader());
-            //RegisterResourceLoader(new TextureLoader());
+            RegisterResourceLoader(new TextureLoader());
             //RegisterResourceLoader(new TextureAtlasLoader());
 
         }
@@ -50,8 +56,6 @@ namespace GameEngineX.Resources {
                 //ResourceManager.highestPriority = ResourceManager.loadingQueue.Max(x => x.Value.Count == 0 ? int.MinValue : x.Key);
             }
 
-            Console.WriteLine("Starting Loading " + resourceLoadingTask.ResourceIdentifier);
-
             IResourceLoader loader = GetLoader(resourceLoadingTask.ResourceType, resourceLoadingTask.ResourceLoadingParametersType);
 
             if (loader == null)
@@ -64,6 +68,8 @@ namespace GameEngineX.Resources {
                 ResourceManager.globalResources[resourceLoadingTask.ResourceIdentifier] = (resourceLoadingTask.ResourceType, resource);
             else
                 ResourceManager.sceneResources[resourceLoadingTask.ResourceIdentifier] = (resourceLoadingTask.ResourceType, resource);
+
+            ResourceManager.queuedResources.TryRemove(resourceLoadingTask.ResourceIdentifier, out object ignored);
         }
 
         public static bool GetResource<R>(string resourceIdentifer, out R resource, bool waitForLoading = true) {
@@ -72,29 +78,26 @@ namespace GameEngineX.Resources {
             (Type type, IResource res) resourceData;
             if (ResourceManager.sceneResources.TryGetValue(resourceIdentifer, out resourceData)) {
             } else if (ResourceManager.globalResources.TryGetValue(resourceIdentifer, out resourceData)) {
-            } else return false;
+            } else if (waitForLoading && ResourceManager.queuedResources.ContainsKey(resourceIdentifer)) {
+                while (ResourceManager.queuedResources.ContainsKey(resourceIdentifer))
+                    Thread.Sleep(100);
+                return GetResource<R>(resourceIdentifer, out resource, false);
+            } else
+                return false;
 
             if (resourceData.type != typeof(R))
                 return false;
 
             Resource<R> res = resourceData.res as Resource<R>;
-
-            if (res.IsLoaded) {
-                resource = res.Data;
-                return true;
-            }
-
-            if (!waitForLoading)
-                return false;
-
-            res.WaitForLoading();   // TODO make it work
-
             resource = res.Data;
 
             return true;
         }
 
         public static void LoadResource<R, RLP>(string resourceIdentifier, RLP resourceLoadingParameters, int loadingPriority, bool globalResource = false) where RLP : ResourceLoadingParameters<R> {
+            if (ResourceManager.queuedResources.ContainsKey(resourceIdentifier))
+                throw new ArgumentException($"Resource with identifier '{resourceIdentifier}' is already queued for loading.");
+
             ResourceLoadingTask loadingTask = new ResourceLoadingTask(resourceIdentifier, typeof(RLP), resourceLoadingParameters, typeof(R), globalResource);
             if (!ResourceManager.loadingQueue.ContainsKey(loadingPriority))
                 ResourceManager.loadingQueue.Add(loadingPriority, new Queue<ResourceLoadingTask>());
@@ -105,6 +108,7 @@ namespace GameEngineX.Resources {
             lock (ResourceManager.loadingQueue) {
                 queue.Enqueue(loadingTask);
                 ResourceManager.loadingQueueSize++;
+                ResourceManager.queuedResources[resourceIdentifier] = null;
 
                 ResourceManager.highestPriority = hPrio;
             }
@@ -147,6 +151,5 @@ namespace GameEngineX.Resources {
         }
 
         public static bool IsLoading => ResourceManager.loadingQueueSize > 0;
-
     }
 }

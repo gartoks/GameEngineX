@@ -23,6 +23,7 @@ namespace GameEngineX.Game.UserInterface {
         }
 
         internal override void Render(int renderLayer, Renderer renderer, float x, float y, float width, float height, GUIComponentInteractionState state) {
+            //renderer.FillCircle(renderLayer - 1, Color.Red, 0, 0, 1);
             renderer.FillRectangle(renderLayer, FindStateColor(state), x, y, width, height);
         }
 

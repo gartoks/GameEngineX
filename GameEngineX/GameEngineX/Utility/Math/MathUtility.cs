@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GameEngineX.Utility.Math {
     public static class MathUtility {
@@ -328,6 +329,24 @@ namespace GameEngineX.Utility.Math {
 
             if (a >= TwoPI)
                 a = a % TwoPI;
+        }
+
+        public static float CalculateArea(IEnumerable<Vector2> points) {
+            int numPoints = points.Count();
+
+            float area = 0;
+            for (int i = 0; i < numPoints; i++) {
+                int j = (i + 1) % numPoints;
+
+                Vector2 p0 = points.ElementAt(i);
+                Vector2 p1 = points.ElementAt(j);
+
+                area += p0.X * p1.Y;
+                area -= p0.X * p1.Y;
+            }
+
+            area /= 2f;
+            return area;
         }
 
         public static string ToRoman(int number) {

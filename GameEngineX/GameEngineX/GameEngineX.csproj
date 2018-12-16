@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>GameEngineX</RootNamespace>
     <AssemblyName>GameEngineX</AssemblyName>
-    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -54,11 +54,18 @@
       <DependentUpon>LogWindow.cs</DependentUpon>
     </Compile>
     <Compile Include="Application\Logging\LogType.cs" />
+    <Compile Include="Game\Animation\IAnimationTimer.cs" />
+    <Compile Include="Game\Animation\LoopTimer.cs" />
+    <Compile Include="Game\Animation\OneTimeTimer.cs" />
+    <Compile Include="Game\Animation\Timeline.cs" />
     <Compile Include="Game\GameBase.cs" />
     <Compile Include="Game\GameObjects\GameObject.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\Animation.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\Collider.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\GameObjectComponent.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\GUIHandler.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\Sprite.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\Timer.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIButton.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIComponent.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIInteractableComponent.cs" />
@@ -66,10 +73,13 @@
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIPanel.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIProgressbar.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUISlider.cs" />
+    <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUITextbox.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIToggleButton.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\UserInterface\GUIDebugDisplay.cs" />
+    <Compile Include="Game\GameObjects\Utility\CollisionData.cs" />
     <Compile Include="Game\GameObjects\Utility\GameObjectComponentSearchMode.cs" />
     <Compile Include="Game\UserInterface\GUIComponentInteractionState.cs" />
+    <Compile Include="Game\UserInterface\GUIDock.cs" />
     <Compile Include="Game\UserInterface\GUIInteractionGraphics.cs" />
     <Compile Include="Game\UserInterface\RequiredComponents.cs" />
     <Compile Include="Game\GameObjects\GameObjectComponents\Viewport.cs" />
@@ -81,6 +91,7 @@
     <Compile Include="Graphics\Renderables\CircleShape.cs" />
     <Compile Include="Graphics\Renderables\CustomShape.cs" />
     <Compile Include="Graphics\Renderables\EllipseShape.cs" />
+    <Compile Include="Graphics\Renderables\PieShape.cs" />
     <Compile Include="Graphics\Renderables\RectangleShape.cs" />
     <Compile Include="Graphics\Renderer.cs" />
     <Compile Include="Graphics\RenderException.cs" />
@@ -90,6 +101,7 @@
     <Compile Include="Graphics\Renderables\Textures\Texture2D.cs" />
     <Compile Include="Graphics\Renderables\Textures\TextureAtlas.cs" />
     <Compile Include="Input\InputHandler.cs" />
+    <Compile Include="Input\KeyModifiers.cs" />
     <Compile Include="Input\MouseButton.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\Resource.cs" />
@@ -106,14 +118,19 @@
     <Compile Include="Utility\DataStructures\QuadTree.cs" />
     <Compile Include="Utility\Exceptions\GameStateException.cs" />
     <Compile Include="Utility\Exceptions\ResourceLoadingException.cs" />
+    <Compile Include="Utility\Extensions\CollectionExtensions.cs" />
     <Compile Include="Utility\Extensions\MatrixExtensions.cs" />
     <Compile Include="Utility\Math\MathUtility.cs" />
     <Compile Include="Utility\Math\NoiseGenerator.cs" />
     <Compile Include="Utility\Math\Polygon.cs" />
     <Compile Include="Utility\Math\Rectangle.cs" />
     <Compile Include="Utility\Math\Vector2.cs" />
-    <Compile Include="Utility\PingPong.cs" />
+    <Compile Include="Game\Animation\PingPongTimer.cs" />
+    <Compile Include="Utility\Pathfinding\AStar.cs" />
+    <Compile Include="Utility\Pathfinding\Path.cs" />
     <Compile Include="Utility\SerializationUtility.cs" />
+    <Compile Include="Utility\Shapes\Circle.cs" />
+    <Compile Include="Utility\Shapes\Shape.cs" />
     <Compile Include="Utility\Tags.cs" />
     <Compile Include="Utility\TimeTracker.cs" />
   </ItemGroup>

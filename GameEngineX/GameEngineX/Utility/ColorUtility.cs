@@ -2,13 +2,25 @@
 
 namespace GameEngineX.Utility {
     public static class ColorUtility {
-        public static Color LerpColors(Color c1, Color c2, float t) {
+        public static Color LerpColors(Color c1, Color c2, float t, bool lerpAlpha = false) {
             float a = c1.A * (1 - t) + c2.A * t;
             float r = c1.R * (1 - t) + c2.R * t;
             float g = c1.G * (1 - t) + c2.G * t;
             float b = c1.B * (1 - t) + c2.B * t;
 
-            return Color.FromArgb((byte)a, (byte)r, (byte)g, (byte)b);
+            return Color.FromArgb(lerpAlpha ? (byte)a : c1.A, (byte)r, (byte)g, (byte)b);
+        }
+
+        public static Color Invert(this Color c) {
+            return Color.FromArgb(255 - c.R, 255 - c.G, 255 - c.B);
+        }
+
+        public static Color Darken(this Color c, float pct = 0.1f) {
+            return Color.FromArgb((int)(c.R * (1f - pct)), (int)(c.G * (1f - pct)), (int)(c.B * (1f - pct)));
+        }
+
+        public static Color Lighten(this Color c, float pct = 0.1f) {
+            return Color.FromArgb((int)(c.R * (1f + pct)), (int)(c.G * (1f + pct)), (int)(c.B * (1f + pct)));
         }
 
         public static string ColorToHex(Color color) {

@@ -138,17 +138,22 @@ namespace GameEngineX.Utility.Math {
         }
 
         public static float Distance(Vector2 v1, Vector2 v2) {
-            float dx = v2.X - v1.X;
-            float dy = v2.Y - v1.Y;
+            return Distance(v1, v2.X, v2.Y);
+        }
 
-            return (float)System.Math.Sqrt(dx * dx + dy * dy);
+        public static float DistanceSqr(Vector2 v1, Vector2 v2) {
+            return DistanceSqr(v1, v2.X, v2.Y);
         }
 
         public static float Distance(Vector2 v1, float x, float y) {
+            return (float)System.Math.Sqrt(DistanceSqr(v1, x, y));
+        }
+
+        public static float DistanceSqr(Vector2 v1, float x, float y) {
             float dx = x - v1.X;
             float dy = y - v1.Y;
 
-            return (float)System.Math.Sqrt(dx * dx + dy * dy);
+            return dx * dx + dy * dy;
         }
 
         public (float x, float y) Data {
@@ -214,6 +219,10 @@ namespace GameEngineX.Utility.Math {
 
         public override string ToString() {
             return $"[{X}, {Y}]";
+        }
+
+        public string ToSimpleString() {
+            return $"[{(int)X}, {(int)Y}]";
         }
 
         public override bool Equals(object obj) {

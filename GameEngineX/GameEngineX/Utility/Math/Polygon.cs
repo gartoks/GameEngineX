@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using GameEngineX.Application.Logging;
 
 namespace GameEngineX.Utility.Math {
     public class Polygon {
@@ -66,13 +67,11 @@ namespace GameEngineX.Utility.Math {
             return new Polygon(false, p0, p1, p2, p3);
         }
 
-        private Vector2[] points;
-        private Vector2[] edges;
+        private Vector2 center;
+        private readonly Vector2[] points;
+        private readonly Vector2[] edges;
 
         private Rect boundingRect;
-
-        private Vector2 center;
-
         private float area;
 
         public Polygon(bool clockwise, params Vector2[] points) {
@@ -96,7 +95,12 @@ namespace GameEngineX.Utility.Math {
             RecalculateBoundingRect();
             RecalculateCenter();
 
-            area = System.Math.Abs(CalculateArea(points));
+            area = System.Math.Abs(MathUtility.CalculateArea(points));
+
+            if (!IsConvex()) {
+                Log.WriteLine("Polygon is not convex.");
+                return;
+            }
         }
 
         private void RecalculateEdges() {
@@ -176,8 +180,7 @@ namespace GameEngineX.Utility.Math {
                 Vector2 p = points[i];
                 Vector2 p1 = points[(i + 1) % numPoints];
 
-                if (((p.Y <= y && y < p1.Y) || (p1.Y <= y && y < p.Y)) &&
-                        x < ((p1.X - p.X) / (p1.Y - p.Y) * (y - p.Y) + p.X))
+                if ((p.Y <= y && y < p1.Y || p1.Y <= y && y < p.Y) && x < (p1.X - p.X) / (p1.Y - p.Y) * (y - p.Y) + p.X)
                     contains = !contains;
             }
 
@@ -207,7 +210,7 @@ namespace GameEngineX.Utility.Math {
             Vector2 prevPoint = points[PrevIndex(vertexIndex)];
             Vector2 nextPoint = points[NextIndex(vertexIndex)];
 
-            float area = CalculateArea(new[] { prevPoint, point, nextPoint });
+            float area = MathUtility.CalculateArea(new[] { prevPoint, point, nextPoint });
 
             if (area < 0)
                 return true;
@@ -222,39 +225,7 @@ namespace GameEngineX.Utility.Math {
 
         //}
 
-        public bool IsConvex() {
-            int numPoints = points.Length;
-
-            if (numPoints < 4)
-                return true;
-
-            bool hasNegTurn = false;
-            bool hasPosTurn = false;
-            for (int i = 0; i < numPoints; i++) {
-                int i1 = (i + 1) % numPoints;
-                int i2 = (i1 + 1) % numPoints;
-
-                Vector2 p = points[i];
-                Vector2 p1 = points[i1];
-                Vector2 p2 = points[i2];
-
-                float xProdLen = (p.X - p1.X) * (p.Y - p1.Y) - (p2.X - p1.X) * (p2.Y - p1.Y);
-
-                if (xProdLen < 0)
-                    hasNegTurn = true;
-                else if (xProdLen > 0)
-                    hasPosTurn = true;
-
-                if (hasNegTurn && hasPosTurn)
-                    return false;
-            }
-
-            return true;
-        }
-
-        public IEnumerable<Vector2> Points {
-            get { return points; }
-        }
+        public IEnumerable<Vector2> Points => points;
 
         public IEnumerable<Vector2> Edges => edges;
 
@@ -293,6 +264,36 @@ namespace GameEngineX.Utility.Math {
         }
 
         public override int GetHashCode() => -501195594 + EqualityComparer<Vector2[]>.Default.GetHashCode(this.points);
+
+        private bool IsConvex() {
+            int numPoints = points.Length;
+
+            if (numPoints < 4)
+                return true;
+
+            bool hasNegTurn = false;
+            bool hasPosTurn = false;
+            for (int i = 0; i < numPoints; i++) {
+                int i1 = (i + 1) % numPoints;
+                int i2 = (i1 + 1) % numPoints;
+
+                Vector2 p = points[i];
+                Vector2 p1 = points[i1];
+                Vector2 p2 = points[i2];
+
+                float xProdLen = (p.X - p1.X) * (p.Y - p1.Y) - (p2.X - p1.X) * (p2.Y - p1.Y);
+
+                if (xProdLen < 0)
+                    hasNegTurn = true;
+                else if (xProdLen > 0)
+                    hasPosTurn = true;
+
+                if (hasNegTurn && hasPosTurn)
+                    return false;
+            }
+
+            return true;
+        }
 
         private bool EdgeIntersectsLine(float x1, float y1, float x2, float y2) {
             float d1x = x2 - x1;
@@ -338,24 +339,5 @@ namespace GameEngineX.Utility.Math {
 
             return i % points.Length;
         }
-
-        public static float CalculateArea(IEnumerable<Vector2> points) {
-            int numPoints = points.Count();
-
-            float area = 0;
-            for (int i = 0; i < numPoints; i++) {
-                int j = (i + 1) % numPoints;
-
-                Vector2 p0 = points.ElementAt(i);
-                Vector2 p1 = points.ElementAt(j);
-
-                area += p0.X * p1.Y;
-                area -= p0.Y * p1.X;
-            }
-
-            area /= 2f;
-            return area;
-        }
-
     }
 }

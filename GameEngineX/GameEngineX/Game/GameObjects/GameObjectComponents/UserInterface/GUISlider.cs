@@ -17,7 +17,7 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
         public Action<GUISlider> OnValueChanged;
 
         protected override void AdditionalInitialize() {
-            this.knobGraphics = new GUIInteractionColors(Color.LawnGreen, Color.LawnGreen, Color.LawnGreen);
+            this.knobGraphics = new GUIInteractionColors(Color.SlateGray, Color.SlateGray, Color.SlateGray);
 
             OnMouseClicked += OnOnMouseDown;
             OnMouseDown += OnOnMouseDown;
@@ -26,7 +26,7 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
             InteractionGraphics = new GUIInteractionColors(Color.DarkGray, Color.DarkGray, Color.DarkGray);
         }
 
-        private void OnOnMouseDown(float x, float y) {
+        private void OnOnMouseDown(GUIComponent c, float x, float y) {
             float px = x / WorldWidth;
 
             Percentage = px;

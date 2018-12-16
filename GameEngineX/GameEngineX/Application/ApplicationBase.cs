@@ -40,6 +40,16 @@ namespace GameEngineX.Application {
             Renderer.DEFAULT_FONT_NAME = parameters.DefaultFont;
             Renderer.BACKGROUND_COLOR = parameters.BackgroundColor;
 
+            Form.FormClosed += (sender, args) => Exit();
+            gameArea.Dock = DockStyle.Fill;
+            if (parameters.Maximize) {
+                Form.FormBorderStyle = FormBorderStyle.None;
+                Form.WindowState = FormWindowState.Maximized;
+            } else {
+                Form.FormBorderStyle = FormBorderStyle.FixedSingle;
+                Form.WindowState = FormWindowState.Normal;
+            }
+
             IsSimulation = parameters.IsSimulation;
 
             this.gameArea = gameArea;
@@ -66,24 +76,41 @@ namespace GameEngineX.Application {
             this.fpsTimer = new TimeTracker(parameters.FramesPerSecond);
 
             this.resourceThread = new Thread(ResourceLoop);
+            this.resourceThread.Name = "ResourceThread";
             this.renderThread = new Thread(RenderLoop);
+            this.renderThread.Name = "RenderThread";
             this.logicThread = new Thread(UpdateLoop);
+            this.logicThread.Name = "LogicThread";
         }
 
         public void Start() {
             this.running = true;
-
-            this.game.Initialize();
 
             this.resourceThread.Start();
 
             this.renderThread.Start();
 
             this.logicThread.Start();
+
+            this.game.Initialize();
         }
 
         public void Exit() {
-            this.running = false;
+            Thread exitThread = new Thread(() => {
+                this.running = false;
+
+                try {
+                    Form.Invoke(new Action(() => {
+                        this.resourceThread.Join();
+                        this.renderThread.Join();
+                        this.logicThread.Join();
+
+                        System.Windows.Forms.Application.Exit();
+                    }));
+                } catch (Exception) {}
+            });
+
+            exitThread.Start();
         }
 
         private void UpdateLoop() {
@@ -109,9 +136,7 @@ namespace GameEngineX.Application {
         }
 
         private void ResourceLoop() {
-
             while (this.running) {
-
                 if (ResourceManager.IsLoading)
                     ResourceManager.ContinueLoading();
                 else
@@ -140,6 +165,8 @@ namespace GameEngineX.Application {
 
         public int FramesPerSecond => this.fpsTimer.TicksPerSecond;
 
-        public abstract bool IsWindowVisible { get; }
+        public abstract Form Form { get; }
+
+        public bool IsWindowVisible => Form.WindowState != FormWindowState.Minimized;
     }
 }

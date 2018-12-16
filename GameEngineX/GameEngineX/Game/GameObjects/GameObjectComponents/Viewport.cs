@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.Serialization;
+using GameEngineX.Application.Logging;
 using GameEngineX.Graphics;
 using GameEngineX.Utility.Math;
+using Rectangle = GameEngineX.Utility.Math.Rectangle;
 
 namespace GameEngineX.Game.GameObjects.GameObjectComponents {
     public sealed class Viewport : GameObjectComponent, ISerializable {
@@ -37,7 +40,7 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
         //}
 
         public override void Initialize() {
-            this.renderTarget = null;
+            RenderTarget = null;
             this.targetSize = (1, 1);
 
             Width = 2f;
@@ -89,24 +92,20 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
         public void ScreenToWorldCoordinates(float sx, float sy, out float wx, out float wy) {
             wx = sx / targetSize.width;
             wy = sy / targetSize.height;
+
+            //wy = 1f - wy;
+
             Rectangle worldBounds = WorldBounds;
-
-            wy = 1f - wy;
-
             wx *= worldBounds.Width;
             wy *= worldBounds.Height;
 
-            wx += worldBounds.X - worldBounds.Center.x;
-            wy += worldBounds.Y - worldBounds.Center.y;
+            wx += worldBounds.X - worldBounds.Center.X;
+            wy += worldBounds.Y - worldBounds.Center.Y;
         }
 
-        public (float x, float y) ScreenToWorldCoordinates((float x, float y) pos) {
-            ScreenToWorldCoordinates(pos.x, pos.y, out float x, out float y);
-
-            pos.x = x;
-            pos.y = y;
-
-            return pos;
+        public Vector2 ScreenToWorldCoordinates(Vector2 pos) {
+            ScreenToWorldCoordinates(pos.X, pos.Y, out float x, out float y);
+            return new Vector2(x, y);
         }
 
         public void WorldToScreenCoordinates(float wx, float wy, out float sx, out float sy) {
@@ -122,13 +121,19 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
             sy *= targetSize.height;
         }
 
-        public (float x, float y) WorldToScreenCoordinates((float x, float y) pos) {
-            WorldToScreenCoordinates(pos.x, pos.y, out float x, out float y);
+        public Vector2 WorldToScreenCoordinates(Vector2 pos) {
+            WorldToScreenCoordinates(pos.X, pos.Y, out float x, out float y);
+            return new Vector2(x, y);
+        }
 
-            pos.x = x;
-            pos.y = y;
+        public void ScreenToGUICoordinates(float sx, float sy, out float gx, out float gy) {
+            gx = sx / targetSize.width - 0.5f;
+            gy = sy / targetSize.height - 0.5f;
+        }
 
-            return pos;
+        public Vector2 ScreenToGUICoordinates(Vector2 pos) {
+            ScreenToGUICoordinates(pos.X, pos.Y, out float x, out float y);
+            return new Vector2(x, y);
         }
 
         public bool IsVisible(float x, float y, float radius = 0) {
@@ -182,10 +187,13 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents {
         public Rectangle WorldBounds {
             get {
                 float ratio = targetSize.height / targetSize.width;
-                float x = Zoom * Width / (2f * ratio);
-                float y = Zoom * Height / 2f;
+                float x = Width / (2f * ratio);
+                float y = Height / 2f;
 
-                return new Rectangle(Transform.Position.X - x, Transform.Position.Y - y, Width / ratio, Height);
+                PointF[] points = { new PointF(x, y) };
+                Transform.GlobalTransformationMatrix.TransformPoints(points);
+
+                return new Rectangle(Transform.Position.X - points[0].X, -Transform.Position.Y - points[0].Y, Width / ratio, Height);
             }
         }
 

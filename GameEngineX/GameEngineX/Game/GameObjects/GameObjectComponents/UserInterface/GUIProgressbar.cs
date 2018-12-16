@@ -23,7 +23,7 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
             InteractionGraphics = new GUIInteractionColors(Color.DarkGray, Color.DarkGray, Color.DarkGray);
         }
 
-        private void OnOnMouseDown(float x, float y) {
+        private void OnOnMouseDown(GUIComponent c, float x, float y) {
             float px = x / WorldWidth;
 
             Value = px;

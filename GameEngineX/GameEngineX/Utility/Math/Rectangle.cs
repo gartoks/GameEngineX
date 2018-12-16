@@ -2,7 +2,6 @@
 
 namespace GameEngineX.Utility.Math {
     public class Rectangle {
-
         public float X;
         public float Y;
         private float width;
@@ -14,6 +13,9 @@ namespace GameEngineX.Utility.Math {
             Width = width;
             Height = height;
         }
+
+        public Rectangle(Vector2 position, Vector2 size)
+            : this(position.X, position.Y, size.X, size.Y) { }
 
         public float Width {
             get => this.width;
@@ -35,29 +37,47 @@ namespace GameEngineX.Utility.Math {
             }
         }
 
-        public float Top => Y;
+        public float Top => Y + Height;
 
-        public float Bottom => Y + Height;
+        public float Bottom => Y;
 
         public float Left => X;
 
         public float Right => X + Width;
 
-        public (float x, float y) Center => (X + Width / 2f, Y + Height / 2f);
+        public float CenterX => X + Width / 2f;
 
-        public (float x, float y) TopLeft => (Left, Top);
+        public float CenterY => Y + Height / 2f;
 
-        public (float x, float y) TopRight => (Right, Top);
+        public Vector2 Center => new Vector2(X + Width / 2f, Y + Height / 2f);
 
-        public (float x, float y) BottomLeft => (Left, Bottom);
+        public Vector2 TopLeft => new Vector2(Left, Top);
 
-        public (float x, float y) BottomRight => (Right, Bottom);
+        public Vector2 TopRight => new Vector2(Right, Top);
 
-        public bool Contains(float x, float y, float radius = 0) {
-            return x + radius >= X && x - radius <= Right && y + radius >= Y && y - radius <= Bottom;
+        public Vector2 BottomLeft => new Vector2(Left, Bottom);
+
+        public Vector2 BottomRight => new Vector2(Right, Bottom);
+
+        public void Scale(float sx, float sy) {
+            float w = Width * sx;
+            float h = Height * sy;
+
+            X += (Width - w) / 2f;
+            Y += (Height - h) / 2f;
+
+            Width = w;
+            Height = h;
         }
 
-        public bool Contains((float x, float y) p, float radius = 0) => Contains(p.x, p.y, radius);
+        public void Translate(float dx, float dy) {
+            X += dx;
+            Y += dy;
+        }
+
+        public bool Contains(float x, float y, float radius = 0) {
+            return x + radius >= Left && x - radius <= Right && y + radius >= Bottom && y - radius <= Top;
+        }
 
         public bool Contains(Vector2 p, float radius = 0) => Contains(p.X, p.Y, radius);
 

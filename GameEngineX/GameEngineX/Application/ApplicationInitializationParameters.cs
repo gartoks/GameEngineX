@@ -11,6 +11,8 @@ namespace GameEngineX.Application {
 
         public bool IsSimulation;
 
+        public bool Maximize;
+
         public bool ShowLogWindow;
         public Color LoggingMessageColor;
         public Color LoggingWarningColor;
@@ -21,6 +23,8 @@ namespace GameEngineX.Application {
             FramesPerSecond = framesPerSecond;
 
             IsSimulation = isSimulation;
+
+            Maximize = false;
 
             BackgroundColor = Color.Black;
 

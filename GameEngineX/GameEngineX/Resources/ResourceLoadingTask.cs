@@ -19,13 +19,5 @@ namespace GameEngineX.Resources {
             ResourceType = resourceType;
             GlobalResource = globalResource;
         }
-
-        //void a<T>() {
-        //    Type t = typeof(T);
-        //    Type t2 = typeof(Resource<>).MakeGenericType(t);
-        //    IResource s = null;
-        //    Resource<T> r = (Resource<T>)Convert.ChangeType(s, t2);
-        //}
-
     }
 }

@@ -25,7 +25,9 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
             Rectangle worldBounds = viewport.WorldBounds;
             viewport.WorldToScreenCoordinates(worldBounds.X + WorldWidth, worldBounds.Y + WorldHeight, out float w, out float h);
 
-            renderer.DrawCenteredText(renderLayer, TextColor, FontName, Text, WorldWidth / 2f, WorldHeight / 2f, ((int)WorldWidth, (int)WorldHeight));
+            ResolveDockingCoordinates(Dock, WorldWidth, WorldHeight, out float x, out float y);
+
+            renderer.DrawText(renderLayer, TextColor, FontName, Text, x, y, ((int)WorldWidth, (int)WorldHeight));
         }
 
         public string Text {
@@ -51,8 +53,6 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
                     }
                 } else
                     this.fontName = "Arial";
-
-
             }
         }
 

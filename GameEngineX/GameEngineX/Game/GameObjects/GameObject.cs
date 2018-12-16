@@ -12,6 +12,8 @@ using GameEngineX.Utility.Math;
 
 namespace GameEngineX.Game.GameObjects {
     public sealed class GameObject : ISerializable {
+        public delegate void GameObjectComponentModificationEventHandler(GameObject gameObject, GameObjectComponent component);
+
         private readonly Guid ID;
 
         private bool isAlive;
@@ -27,6 +29,9 @@ namespace GameEngineX.Game.GameObjects {
         private readonly HashSet<GameObject> children;
 
         private readonly Transform transform;
+
+        public event GameObjectComponentModificationEventHandler OnComponentAdd;
+        public event GameObjectComponentModificationEventHandler OnComponentRemove;
 
         public GameObject(string name)
             : this(name, null, 0, null) { }
@@ -98,8 +103,10 @@ namespace GameEngineX.Game.GameObjects {
             this.updatingChildren.Clear();
             this.updatingChildren.AddRange(Children);
 
-            foreach (GameObjectComponent component in this.components) {
-                if (!component.IsEnabled)
+            for (int i = this.components.Count - 1; i >= 0; i--) {
+                GameObjectComponent component = this.components[i];
+
+                if (!component.IsActive)
                     continue;
 
                 component.Update(deltaTime);
@@ -157,11 +164,13 @@ namespace GameEngineX.Game.GameObjects {
 
             renderer.ApplyTransformation(Transform);
 
-            foreach (IRendering r in this.renderables) {
-                if (!((GameObjectComponent)r).IsEnabled)
-                    continue;
+            lock (this.renderables) {
+                foreach (IRendering r in this.renderables) {
+                    if (!((GameObjectComponent)r).IsEnabled)
+                        continue;
 
-                r.Renderable.Render(r.RenderLayer, renderer);
+                    r.Renderable.Render(r.RenderLayer, renderer);
+                }
             }
 
             this.renderingChildren.Clear();
@@ -199,24 +208,37 @@ namespace GameEngineX.Game.GameObjects {
 
             component.IsEnabled = isEnabled;
 
+            if (component is IRendering r) {
+                lock (this.renderables) {
+                    this.renderables.Add(r);
+                    this.renderables.Sort((x, y) => y.RenderLayer.CompareTo(x.RenderLayer));
+                }
+            }
+
+            if (fields != null && fields.Any()) {
+                foreach ((string fieldName, object fielValue) fieldData in fields) {
+                    Type tmpT = t;
+                    FieldInfo fI = null;
+                    while (tmpT != null) {
+                        fI = tmpT.GetField(fieldData.fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                        
+                        if (fI != null)
+                            break;
+
+                        tmpT = tmpT.BaseType;
+                    }
+
+
+                    if (fI == null)
+                        throw new SerializationException("Cannot initialize component field.");
+
+                    fI.SetValue(component, fieldData.fielValue);
+                }
+            }
+
             component.Initialize();
 
-            if (component is IRendering r) {
-                this.renderables.Add(r);
-                this.renderables.Sort((x, y) => y.RenderLayer.CompareTo(x.RenderLayer));
-            }
-
-            if (fields == null)
-                return component;
-
-            foreach ((string fieldName, object fielValue) fieldData in fields) {
-                FieldInfo field = t.GetField(fieldData.fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-
-                if (field == null)
-                    throw new SerializationException("Cannot initialize component field.");
-
-                field.SetValue(component, fieldData.fielValue);
-            }
+            OnComponentAdd?.Invoke(this, component);
 
             return component;
         }
@@ -225,14 +247,19 @@ namespace GameEngineX.Game.GameObjects {
             if (!this.components.Contains(component))
                 return;
 
+
             component.Death();
+
+            OnComponentRemove?.Invoke(this, component);
 
             this.components.Remove(component);
             if (!(component is IRendering r))
                 return;
 
-            this.renderables.Remove(r);
-            this.renderables.Sort((x, y) => y.RenderLayer.CompareTo(x.RenderLayer));
+            lock (this.renderables) {
+                this.renderables.Remove(r);
+                this.renderables.Sort((x, y) => y.RenderLayer.CompareTo(x.RenderLayer));
+            }
         }
 
         public T GetComponent<T>(GameObjectComponentSearchMode searchMode = GameObjectComponentSearchMode.This, bool includeDerivations = true) where T : GameObjectComponent {
@@ -264,22 +291,25 @@ namespace GameEngineX.Game.GameObjects {
 
             if ((searchMode & GameObjectComponentSearchMode.ParentalHierarchy) > 0 && Parent != null) {
                 comps = comps.Concat(Parent.GetComponents(t, GameObjectComponentSearchMode.ParentalHierarchy, includeDerivations));
-                //foreach (GameObject parent in GetParentalHierarchy(false)) {
-                //    comps = comps.Concat(parent.GetComponents(t, GameObjectComponentSearchMode.This, includeDerivations));
-                //}
             }
 
             return comps;
         }
 
-        public IEnumerable<GameObjectComponent> FindComponents(Func<GameObjectComponent, bool> selector, bool includeChildren = false) {
+        public IEnumerable<GameObjectComponent> FindComponents(Func<GameObjectComponent, bool> selector, GameObjectComponentSearchMode searchMode = GameObjectComponentSearchMode.This) {
             IEnumerable<GameObjectComponent> comps = this.components.Where(selector);
 
-            if (!includeChildren)
+            if (searchMode == GameObjectComponentSearchMode.This)
                 return comps;
 
-            foreach (GameObject child in this.children) {
-                comps = comps.Concat(child.FindComponents(selector, true));
+            if ((searchMode & GameObjectComponentSearchMode.ChildHierarchy) > 0) {
+                foreach (GameObject child in this.children) {
+                    comps = comps.Concat(child.FindComponents(selector, GameObjectComponentSearchMode.ChildHierarchy));
+                }
+            }
+
+            if ((searchMode & GameObjectComponentSearchMode.ParentalHierarchy) > 0 && Parent != null) {
+                comps = comps.Concat(Parent.FindComponents(selector, GameObjectComponentSearchMode.ParentalHierarchy));
             }
 
             return comps;
@@ -354,8 +384,8 @@ namespace GameEngineX.Game.GameObjects {
         public void Destroy() {
             this.isAlive = false;
 
-            foreach (GameObjectComponent component in this.components) {
-                component.Destroy();    // TODO may not work as it modifies the list
+            for (int i = this.components.Count - 1; i >= 0; i--) {
+                this.components[i].Destroy();
             }
         }
 
@@ -377,6 +407,10 @@ namespace GameEngineX.Game.GameObjects {
 
         public override int GetHashCode() {
             return ID.GetHashCode();
+        }
+
+        public override string ToString() {
+            return $"GO [{Name}]";
         }
 
         public void GetObjectData(SerializationInfo info, StreamingContext context) {

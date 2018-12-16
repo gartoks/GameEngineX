@@ -3,7 +3,6 @@ using System.Drawing;
 
 namespace GameEngineX.Application.Logging {
     public static class Log {
-
         private static Color messageColor;
         private static Color warningColor;
         private static Color errorColor;
@@ -16,7 +15,7 @@ namespace GameEngineX.Application.Logging {
 
         public static event Action<string, Color> OnLog;
 
-        public static void LogLine(string text, LogType messageType = LogType.Message) {
+        public static void WriteLine(string text, LogType messageType = LogType.Message) {
             DateTime timestamp = DateTime.Now;
             text = $"[{timestamp.Hour.ToString().PadLeft(2, '0')}:{timestamp.Minute.ToString().PadLeft(2, '0')}:{timestamp.Second.ToString().PadLeft(2, '0')}]: {text}";
             OnLog?.Invoke(text, LogTypeToColor(messageType));
@@ -49,6 +48,5 @@ namespace GameEngineX.Application.Logging {
                     throw new ArgumentOutOfRangeException(nameof(logType), logType, null);
             }
         }
-
     }
 }

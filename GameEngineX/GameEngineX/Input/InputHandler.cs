@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Windows.Input;
+using GameEngineX.Utility.Math;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 
 namespace GameEngineX.Input {
     public static class InputHandler {
         static InputHandler() {
+            InputHandler.keyChars = new Dictionary<Key, char>();
             InputHandler.pressedKeys = new HashSet<Key>();
             InputHandler.downKeys = new HashSet<Key>();
             InputHandler.releasedKeys = new HashSet<Key>();
@@ -20,6 +22,10 @@ namespace GameEngineX.Input {
 
             InputHandler.prevMousePos = (0, 0);
         }
+
+        private static int ControlHeight;
+
+        private static Dictionary<Key, char> keyChars;
 
         private static HashSet<Key> pressedKeys;
         private static HashSet<Key> downKeys;
@@ -36,11 +42,29 @@ namespace GameEngineX.Input {
         private static (int x, int y) prevMousePos;
         private static int mouseWheelDelta;
 
+        public delegate void KeyEvent(Key key, KeyModifiers modifiers);
+        public delegate void KeyPressEvent(char keyChar);
+        public delegate void MouseMoveEvent(int x, int y);
+        public delegate void MouseButtonEvent(MouseButton button, int x, int y);
+        public delegate void MouseWheelEvent(int wheelDelta, int x, int y);
+
+        public static event KeyEvent OnKeyDown;
+        public static event KeyEvent OnKeyUp;
+        public static event KeyPressEvent OnKeyPressed;
+        public static event MouseMoveEvent OnMouseMove;
+        public static event MouseButtonEvent OnMouseButtonDown;
+        public static event MouseButtonEvent OnMouseButtonUp;
+        public static event MouseWheelEvent OnMouseWheelMove;
+
+
         internal static void Initialize(Control control) {
+            ControlHeight = control.Height;
+
             control.MouseEnter += (o, e) => control.Focus();
 
             control.KeyDown += Control_KeyDown;
             control.KeyUp += Control_KeyUp;
+            control.KeyPress += Control_KeyPress;
 
             control.MouseMove += Control_MouseMove;
             control.MouseDown += Control_MouseDown;
@@ -49,7 +73,7 @@ namespace GameEngineX.Input {
         }
 
         internal static void Update() {
-            InputHandler.prevMousePos = MousePosition;
+            InputHandler.prevMousePos = mousePos;
 
             InputHandler.pressedKeys.Clear();
             InputHandler.releasedKeys.Clear();
@@ -113,7 +137,13 @@ namespace GameEngineX.Input {
             return InputHandler.releasedKeys.Contains(key);
         }
 
+        public static IEnumerable<Key> PressedKeys => InputHandler.pressedKeys;
+
         public static IEnumerable<Key> DownKeys => InputHandler.downKeys;
+
+        public static char KeyToChar(Key key) {
+            return InputHandler.keyChars.TryGetValue(key, out char c) ? c : '\0';
+        }
 
         public static bool IsMouseButtonPressed(MouseButton button) {
             //return InputHandler.pressedButtons.Contains(button);
@@ -160,15 +190,9 @@ namespace GameEngineX.Input {
             }
         }
 
-        public static (int x, int y) MousePosition => (InputHandler.mousePos.x, InputHandler.mousePos.y);
+        public static Vector2 MousePosition => new Vector2(InputHandler.mousePos.x, InputHandler.mousePos.y);
 
-        public static (int dx, int dy) MouseMovement {
-            get {
-                (int x, int y) mP = MousePosition;
-
-                return (mP.x - InputHandler.prevMousePos.x, mP.y - InputHandler.prevMousePos.y);
-            }
-        }
+        public static Vector2 MouseMovement => new Vector2(mousePos.x - InputHandler.prevMousePos.x, mousePos.y - InputHandler.prevMousePos.y);
 
         public static int MouseWheelDelta => InputHandler.mouseWheelDelta;
 
@@ -176,39 +200,78 @@ namespace GameEngineX.Input {
         private static void Control_KeyDown(object sender, KeyEventArgs e) {
             Key key = KeyInterop.KeyFromVirtualKey((int)e.KeyCode);
             InputHandler.internal_downKeys.Add(key);
+
+            lastKeyPressed = key;
+
+            int keyModifierFlags = (e.Alt ? (int)KeyModifiers.Alt : 0) | (e.Alt ? (int)KeyModifiers.Control : 0) | (e.Alt ? (int)KeyModifiers.Shift : 0);
+            OnKeyDown?.Invoke(key, (KeyModifiers)keyModifierFlags);
         }
 
         private static readonly HashSet<Key> internal_upKeys = new HashSet<Key>();
         private static void Control_KeyUp(object sender, KeyEventArgs e) {
             Key key = KeyInterop.KeyFromVirtualKey((int)e.KeyCode);
             InputHandler.internal_upKeys.Add(key);
+
+            int keyModifierFlags = (e.Alt ? (int)KeyModifiers.Alt : 0) | (e.Alt ? (int)KeyModifiers.Control : 0) | (e.Alt ? (int)KeyModifiers.Shift : 0);
+            OnKeyUp?.Invoke(key, (KeyModifiers)keyModifierFlags);
+        }
+
+        private static Key? lastKeyPressed;
+        private static void Control_KeyPress(object sender, KeyPressEventArgs e) {
+            if (lastKeyPressed != null) {
+                if (!InputHandler.keyChars.ContainsKey((Key)lastKeyPressed)) {
+                    InputHandler.keyChars[(Key)lastKeyPressed] = e.KeyChar;
+                }
+                lastKeyPressed = null;
+            }
+
+            OnKeyPressed?.Invoke(e.KeyChar);
         }
 
         private static void Control_MouseMove(object sender, MouseEventArgs e) {
-            InputHandler.mousePos = (e.X, e.Y);
+            InputHandler.mousePos = (e.X, ControlHeight - e.Y);
+
+            OnMouseMove?.Invoke(e.X, ControlHeight - e.Y);
         }
+
         private static readonly HashSet<MouseButton> internal_downButtons = new HashSet<MouseButton>();
         private static void Control_MouseDown(object sender, MouseEventArgs e) {
+            MouseButton button;
             if (e.Button == MouseButtons.Left)
-                internal_downButtons.Add(MouseButton.Left);
+                button = MouseButton.Left;
             else if (e.Button == MouseButtons.Right)
-                internal_downButtons.Add(MouseButton.Right);
+                button = MouseButton.Right;
             else if (e.Button == MouseButtons.Middle)
-                internal_downButtons.Add(MouseButton.Middle);
+                button = MouseButton.Middle;
+            else
+                throw new Exception();
+
+            internal_downButtons.Add(button);
+
+            OnMouseButtonDown?.Invoke(button, e.X, ControlHeight - e.Y);
         }
 
         private static readonly HashSet<MouseButton> internal_upButtons = new HashSet<MouseButton>();
         private static void Control_MouseUp(object sender, MouseEventArgs e) {
+            MouseButton button;
             if (e.Button == MouseButtons.Left)
-                internal_upButtons.Add(MouseButton.Left);
+                button = MouseButton.Left;
             else if (e.Button == MouseButtons.Right)
-                internal_upButtons.Add(MouseButton.Right);
+                button = MouseButton.Right;
             else if (e.Button == MouseButtons.Middle)
-                internal_upButtons.Add(MouseButton.Middle);
+                button = MouseButton.Middle;
+            else
+                throw new Exception();
+
+            internal_upButtons.Add(button);
+
+            OnMouseButtonUp?.Invoke(button, e.X, ControlHeight - e.Y);
         }
 
         private static void Control_MouseWheel(object sender, MouseEventArgs e) {
             InputHandler.mouseWheelDelta += e.Delta;
+
+            OnMouseWheelMove?.Invoke(e.Delta, e.X, ControlHeight - e.Y);
         }
 
         //[DllImport("user32.dll")]

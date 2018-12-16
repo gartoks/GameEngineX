@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Runtime.Serialization;
 using GameEngineX.Application;
 
@@ -12,9 +13,9 @@ namespace GameEngineX.Graphics {
         }
 
         public void GetObjectData(SerializationInfo info, StreamingContext context) {
-        }
+            }
 
-        public System.Drawing.Graphics Graphics => System.Drawing.Graphics.FromHwnd(ApplicationBase.Instance.GameArea.Handle);
+        public System.Drawing.Graphics Graphics => System.Drawing.Graphics.FromHwnd((IntPtr)ApplicationBase.Instance.GameArea.Invoke(new Func<IntPtr>(() => ApplicationBase.Instance.GameArea.Handle)));
 
         public Rectangle TargetRectangle => ApplicationBase.Instance.GameArea.ClientRectangle;
     }

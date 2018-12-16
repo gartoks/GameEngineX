@@ -5,23 +5,25 @@ namespace GameEngineX.Game.GameObjects.GameObjectComponents.UserInterface {
 
         public bool Enabled = true;
 
-        public event Action<float, float> OnMouseClicked;
-        public event Action<float, float> OnMouseDown;
-        public event Action<float, float> OnMouseReleased;
+        public bool HasFocus { get; internal set; }
+
+        public event Action<GUIComponent, float, float> OnMouseClicked;
+        public event Action<GUIComponent, float, float> OnMouseDown;
+        public event Action<GUIComponent, float, float> OnMouseReleased;
 
         internal void InvokeMouseClicked(float mouseX, float mouseY) {
             if (Enabled)
-                OnMouseClicked?.Invoke(mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
+                OnMouseClicked?.Invoke(this, mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
         }
 
         internal void InvokeMouseDown(float mouseX, float mouseY) {
             if (Enabled)
-                OnMouseDown?.Invoke(mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
+                OnMouseDown?.Invoke(this, mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
         }
 
         internal void InvokeMouseReleased(float mouseX, float mouseY) {
             if (Enabled)
-                OnMouseReleased?.Invoke(mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
+                OnMouseReleased?.Invoke(this, mouseX - Transform.Position.X, mouseY - Transform.Position.Y);
         }
 
     }
